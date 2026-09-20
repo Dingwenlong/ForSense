@@ -1,0 +1,7 @@
+node_modules/
+.vite/
+out/
+output/
+resources/media/*.exe
+*.log
+.DS_Store
