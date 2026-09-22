@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, ArrowUpRight, Check, CheckCircle2, ChevronRight, Copy, Download, FileText, Film, FolderOpen, GripVertical, ImagePlus, Images, Leaf, LoaderCircle, MessageCircle, MoreHorizontal, Music2, Plus, Radio, Search, Settings2, ShieldCheck, Sparkles, Trash2, X, Crop as CropIcon } from 'lucide-react';
-import type { Draft, MediaAsset, Edits, VideoSource } from '../shared/types';
+import type { Draft, MediaAsset, VideoSource } from '../shared/types';
 import { useJobs, errorText } from './hooks';
 import { Preview } from './Preview';
 import { Modal } from './Modal';
@@ -69,45 +68,183 @@ export function App() {
   const filtered = drafts.filter(d => (filter === 'all' || d.platform === filter) && `${d.title} ${d.caption}`.toLowerCase().includes(query.toLowerCase()));
   const hasLive = draft?.items.some(item => item.kind === 'live');
   return <div className="app-shell">
-    <aside className="sidebar"><div className="brand"><div className="brand-mark"><Leaf size={25} strokeWidth={1.6}/></div><div><strong>片语</strong><span>把日常，整理成分享</span></div></div>
-      <button className="primary new-draft" onClick={newDraft} disabled={working || loading}><Plus size={17}/>新建图文<span>＋</span></button>
-      <div className="nav-label">我的工作台</div><nav className="platform-nav" aria-label="草稿分类">{[['all', '全部草稿', FileText], ['moments', '朋友圈', MessageCircle], ['douyin', '抖音图文', Music2]].map(([value, label, Icon]) => {
-        const I = Icon as typeof FileText; return <button key={value as string} className={filter === value ? 'active' : ''} onClick={() => setFilter(value as string)}><I size={17}/><span>{label as string}</span><small>{drafts.filter(d => value === 'all' || d.platform === value).length}</small></button>;
-      })}</nav>
-      <div className="draft-section"><div className="nav-label">最近的灵感<span>{filtered.length}</span></div><div className="search"><Search size={15}/><input aria-label="搜索草稿" placeholder="搜索标题或文案" value={query} onChange={e => setQuery(e.target.value)}/>{query && <button className="icon-button small-icon" aria-label="清空搜索" onClick={() => setQuery('')}><X size={12}/></button>}</div>
-        <div className="draft-list">{filtered.map(item => <button key={item.id} className={`draft-card ${draft?.id === item.id ? 'selected' : ''}`} onClick={() => select(item)} disabled={working}>
-          <div className="draft-thumb">{item.items[0] ? <img src={item.items[0].imageUrl} alt=""/> : <FileText size={21} strokeWidth={1.3}/>}</div><div><strong>{item.title || '未命名草稿'}</strong><span>{item.platform === 'moments' ? '朋友圈' : '抖音'} · {item.items.length} 张素材</span><small>{new Date(item.updatedAt).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })}</small></div>
-        </button>)}{!filtered.length && <div className="search-empty">{query ? '还没有匹配的草稿' : '这里还没有草稿'}<button className="text-button" onClick={newDraft} disabled={working}>写下新的灵感<ChevronRight size={13}/></button></div>}</div>
-      </div><div className="sidebar-bottom"><div className="local-status"><span className="status-dot"/><span>本地保存 · 只属于你</span></div><button className="sidebar-help" onClick={() => setAbout(true)}><Settings2 size={16}/>使用与存储<ArrowUpRight size={14}/></button></div>
+    <aside className="sidebar">
+      <h1>片语</h1>
+      <button onClick={newDraft} disabled={working || loading}>新建图文</button>
+      <fieldset className="platform-nav">
+        <legend>草稿分类</legend>
+        {([['all', '全部草稿'], ['moments', '朋友圈'], ['douyin', '抖音图文']] as const).map(([value, label]) =>
+          <button key={value} aria-pressed={filter === value} onClick={() => setFilter(value)}>
+            {label}（{drafts.filter(d => value === 'all' || d.platform === value).length}）
+          </button>
+        )}
+      </fieldset>
+      <div className="draft-section">
+        <label className="field-label">搜索草稿
+          <input aria-label="搜索草稿" placeholder="标题或文案" value={query} onChange={e => setQuery(e.target.value)}/>
+        </label>
+        {query && <button onClick={() => setQuery('')}>清空搜索</button>}
+        <p>草稿列表（{filtered.length}）</p>
+        <div className="draft-list">
+          {filtered.map(item => <button key={item.id} className="draft-card" aria-pressed={draft?.id === item.id} onClick={() => select(item)} disabled={working}>
+            {item.items[0] && <img className="draft-thumb" src={item.items[0].imageUrl} alt=""/>}
+            <span><strong>{item.title || '未命名草稿'}</strong><br/>
+              {item.platform === 'moments' ? '朋友圈' : '抖音'} · {item.items.length} 张素材<br/>
+              {new Date(item.updatedAt).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })}
+            </span>
+          </button>)}
+          {!filtered.length && <p>{query ? '没有匹配的草稿' : '没有草稿'}</p>}
+        </div>
+      </div>
+      <div className="sidebar-bottom"><p>本地保存</p><button onClick={() => setAbout(true)}>使用与存储</button></div>
     </aside>
-    <main className="main-workspace"><header className="workspace-header"><div className="breadcrumb">我的工作台<ChevronRight size={14}/><span>{draft?.platform === 'douyin' ? '抖音图文' : '朋友圈图文'}</span></div><div className={`save-indicator ${saveStatus === '保存失败' ? 'danger-text' : ''}`}>{saveStatus === '保存中…' ? <LoaderCircle className="spin" size={13}/> : <Check size={14}/>}<span>{saveStatus}</span></div></header>
-    {draft ? <div className="editor-preview-layout"><section className="editor"><div className="editor-heading"><div className="eyebrow">A LITTLE STORY, READY TO SHARE</div><div className="title-line"><input aria-label="草稿标题" value={draft.title} disabled={working} maxLength={120} onChange={e => change({ title: e.target.value })} onBlur={() => { if (!draftRef.current?.title.trim()) change({ title: '未命名草稿' }); }}/><div className="title-actions"><button className="icon-button" aria-label="复制草稿" title="复制草稿" disabled={working} onClick={() => void perform(async () => { await flush(); const next = await window.desktop.duplicateDraft(draft.id); updateList(next); show(next); })}><Copy size={16}/></button><button className="icon-button" aria-label="删除草稿" title="删除草稿" disabled={working} onClick={() => setDeleteConfirm(true)}><Trash2 size={16}/></button></div></div><p>选好照片，写下想说的话。剩下的交给预览。</p></div>
-      <div className="platform-choice"><span>发布到</span><div className="segmented"><button className={draft.platform === 'moments' ? 'active' : ''} disabled={working} onClick={() => change({ platform: 'moments' })}><MessageCircle size={15}/>朋友圈</button><button className={draft.platform === 'douyin' ? 'active' : ''} disabled={working} onClick={() => change({ platform: 'douyin' })}><Music2 size={15}/>抖音图文</button></div></div>
-      <section className="asset-section"><div className="section-title"><div><span className="section-number">01</span><h2>整理画面</h2><span className="count-tag">{draft.items.length}</span></div><div className="button-row"><button className="text-button video-entry" disabled={working} onClick={() => setVideoOpen(true)}><Film size={15}/>从视频取材</button><button className="secondary compact" disabled={working} onClick={() => importFiles()}><Plus size={15}/>添加图片</button></div></div>
-        <div className={`asset-dropzone ${dragging ? 'drag-over' : ''}`} onDragOver={e => { e.preventDefault(); if (e.dataTransfer.types.includes('Files') && !working) setDragging(true); }} onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragging(false); }} onDrop={e => { e.preventDefault(); setDragging(false); if (working || !e.dataTransfer.files.length) return; const paths = window.desktop.pathsForFiles(Array.from(e.dataTransfer.files)); if (paths.some(p => /\.(mov|mp4)$/i.test(p))) { setNotice({ text: '视频请通过“从视频取材”打开', error: true }); return; } importFiles(paths); }}>
-        {draft.items.length ? <div className="asset-grid">{draft.items.map((asset, index) => <article className="asset-card" key={asset.id} draggable={!working} onDragStart={() => dragged.current = index} onDragOver={e => e.preventDefault()} onDrop={e => { if (dragged.current !== null) { e.stopPropagation(); e.preventDefault(); reorder(dragged.current, index); dragged.current = null; } }} onDragEnd={() => dragged.current = null}>
-          <div className="asset-picture"><img src={asset.imageUrl} alt={asset.name}/><span className="asset-order">{String(index + 1).padStart(2, '0')}</span>{asset.kind === 'live' && <span className="asset-live"><Radio size={11}/>LIVE</span>}<button className="remove-asset" aria-label={`移除第 ${index + 1} 张图片`} disabled={working} onClick={() => change({ items: draft.items.filter(i => i.id !== asset.id) })}><X size={13}/></button></div>
-          <div className="asset-toolbar"><GripVertical size={13} className="drag-grip"/><span>{asset.width} × {asset.height}</span><button title="向前移动" aria-label={`前移第 ${index + 1} 张`} disabled={working || index === 0} onClick={() => reorder(index, index - 1)}><ArrowUp size={13}/></button><button title="向后移动" aria-label={`后移第 ${index + 1} 张`} disabled={working || index === draft.items.length - 1} onClick={() => reorder(index, index + 1)}><ArrowDown size={13}/></button><button aria-label={`编辑第 ${index + 1} 张图片`} title="裁切与旋转" disabled={working} onClick={() => setCropAsset(asset)}><CropIcon size={14}/></button></div>
-        </article>)}<button className="add-tile" onClick={() => importFiles()} disabled={working}><Plus size={23}/><span>继续添加</span></button></div>
-          : <button className="empty-dropzone" disabled={working} onClick={() => importFiles()}><div className="empty-image-stack"><div/><Images size={33} strokeWidth={1.3}/></div><strong>把照片放进来，故事就开始了</strong><span>拖放图片到这里，或点击选择文件</span><small>JPG · PNG · WebP</small></button>}
-        </div><div className="section-hint"><GripVertical size={13}/><span>拖动调整顺序，裁切与旋转会保留原图。</span></div>
-      </section>
-      <section className="caption-section"><div className="section-title"><div><span className="section-number">02</span><h2>写下片语</h2></div><button className="text-button" disabled={!draft.caption} onClick={() => void perform(async () => { await window.desktop.copyText(draft.caption); setNotice({ text: '文案已复制，可粘贴到发布页面' }); })}><Copy size={14}/>复制文案</button></div><div className="caption-box"><textarea aria-label="发布文案" placeholder={'这一刻，有什么想说的？\n\n记录心情、分享故事，也可以加上你喜欢的话题。'} value={draft.caption} disabled={working} maxLength={100000} onChange={e => change({ caption: e.target.value })}/><footer><span>文案与图片独立保存</span><span>{Array.from(draft.caption).length.toLocaleString()} 字</span></footer></div></section>
-      <div className="editor-bottom"><ShieldCheck size={15}/><span>素材在这台电脑上处理，安心创作。</span></div>
-    </section><aside className="preview-panel"><div className="preview-heading"><div><span className="section-number">03</span><h2>图文排版预览</h2></div><span className="preview-live-dot">实时预览</span></div><div className="preview-scroll"><Preview draft={draft}/></div><div className="export-bar"><div><strong>{draft.items.length} 个素材<span> · </span>{Array.from(draft.caption).length} 字</strong><small>按预览顺序，打包好每一次分享</small></div><button className="primary full-width export-button" disabled={working || (!draft.items.length && !draft.caption.trim())} onClick={() => { setExportOpen(true); setExportResult(null); }}><Download size={17}/>导出素材包<ArrowUpRight size={16}/></button></div></aside></div>
-    : <div className="workspace-empty">{loading ? <LoaderCircle className="spin" size={30}/> : <><Leaf size={44}/><h1>从一篇图文开始</h1><p>把照片与文案整理好，再分享给在意的人。</p><button className="primary" onClick={newDraft}><Plus size={17}/>新建图文</button></>}</div>}
+    <main className="main-workspace">
+      <header className="workspace-header">
+        <span>{draft?.platform === 'douyin' ? '抖音图文' : '朋友圈图文'}</span>
+        <span role="status">{saveStatus}</span>
+      </header>
+      {draft ? <div className="editor-preview-layout">
+        <section className="editor">
+          <h2>编辑草稿</h2>
+          <label className="field-label">草稿标题
+            <input aria-label="草稿标题" value={draft.title} disabled={working} maxLength={120}
+              onChange={e => change({ title: e.target.value })}
+              onBlur={() => { if (!draftRef.current?.title.trim()) change({ title: '未命名草稿' }); }}/>
+          </label>
+          <div className="controls">
+            <button disabled={working} onClick={() => void perform(async () => { await flush(); const next = await window.desktop.duplicateDraft(draft.id); updateList(next); show(next); })}>复制草稿</button>
+            <button disabled={working} onClick={() => setDeleteConfirm(true)}>删除草稿</button>
+          </div>
+          <fieldset className="platform-choice">
+            <legend>发布平台</legend>
+            <div className="controls">
+              <button aria-pressed={draft.platform === 'moments'} disabled={working} onClick={() => change({ platform: 'moments' })}>朋友圈</button>
+              <button aria-pressed={draft.platform === 'douyin'} disabled={working} onClick={() => change({ platform: 'douyin' })}>抖音图文</button>
+            </div>
+          </fieldset>
+          <section>
+            <h2>图片素材（{draft.items.length}）</h2>
+            <div className="controls">
+              <button disabled={working} onClick={() => setVideoOpen(true)}>从视频取材</button>
+              <button disabled={working} onClick={() => importFiles()}>添加图片</button>
+            </div>
+            <div className="asset-dropzone" data-drag-over={dragging}
+              onDragOver={e => { e.preventDefault(); if (e.dataTransfer.types.includes('Files') && !working) setDragging(true); }}
+              onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragging(false); }}
+              onDrop={e => {
+                e.preventDefault(); setDragging(false);
+                if (working || !e.dataTransfer.files.length) return;
+                const paths = window.desktop.pathsForFiles(Array.from(e.dataTransfer.files));
+                if (paths.some(p => /\.(mov|mp4)$/i.test(p))) { setNotice({ text: '视频请通过“从视频取材”打开', error: true }); return; }
+                importFiles(paths);
+              }}>
+              {draft.items.length ? <div className="asset-grid">
+                {draft.items.map((asset, index) => <article className="asset-card" key={asset.id} draggable={!working}
+                  onDragStart={() => dragged.current = index} onDragOver={e => e.preventDefault()}
+                  onDrop={e => { if (dragged.current !== null) { e.stopPropagation(); e.preventDefault(); reorder(dragged.current, index); dragged.current = null; } }}
+                  onDragEnd={() => dragged.current = null}>
+                  <img src={asset.imageUrl} alt={asset.name}/>
+                  <div>第 {index + 1} 张 · {asset.width} × {asset.height} {asset.kind === 'live' && <span className="asset-live">实况</span>}</div>
+                  <div className="controls">
+                    <button aria-label={'前移第 ' + (index + 1) + ' 张'} disabled={working || index === 0} onClick={() => reorder(index, index - 1)}>前移</button>
+                    <button aria-label={'后移第 ' + (index + 1) + ' 张'} disabled={working || index === draft.items.length - 1} onClick={() => reorder(index, index + 1)}>后移</button>
+                    <button aria-label={'编辑第 ' + (index + 1) + ' 张图片'} disabled={working} onClick={() => setCropAsset(asset)}>裁切 / 旋转</button>
+                    <button aria-label={'移除第 ' + (index + 1) + ' 张图片'} disabled={working} onClick={() => change({ items: draft.items.filter(i => i.id !== asset.id) })}>移除</button>
+                  </div>
+                </article>)}
+                <button className="add-more" onClick={() => importFiles()} disabled={working}>继续添加</button>
+              </div> : <button className="empty-dropzone" disabled={working} onClick={() => importFiles()}>点击选择或拖入图片（JPG / PNG / WebP）</button>}
+            </div>
+            <p>可拖动或使用前移、后移按钮调整顺序。裁切与旋转保留原图。</p>
+          </section>
+          <section>
+            <h2>发布文案</h2>
+            <textarea className="caption-input" aria-label="发布文案" placeholder="输入发布文案" rows={7}
+              value={draft.caption} disabled={working} maxLength={100000} onChange={e => change({ caption: e.target.value })}/>
+            <div className="controls">
+              <span>{Array.from(draft.caption).length.toLocaleString()} 字</span>
+              <button disabled={!draft.caption} onClick={() => void perform(async () => { await window.desktop.copyText(draft.caption); setNotice({ text: '文案已复制，可粘贴到发布页面' }); })}>复制文案</button>
+            </div>
+            <p>文案与图片独立保存。</p>
+          </section>
+        </section>
+        <aside className="preview-panel">
+          <h2>图文排版预览</h2>
+          <div className="preview-scroll"><Preview draft={draft}/></div>
+          <div className="export-bar">
+            <p>{draft.items.length} 个素材 · {Array.from(draft.caption).length} 字</p>
+            <button disabled={working || (!draft.items.length && !draft.caption.trim())} onClick={() => { setExportOpen(true); setExportResult(null); }}>导出素材包</button>
+          </div>
+        </aside>
+      </div> : <div className="workspace-empty">
+        {loading ? <p role="status">正在加载草稿…</p> : <><p>没有打开的草稿。</p><button onClick={newDraft}>新建图文</button></>}
+      </div>}
     </main>
-    {notice && <div role="status" className={`toast ${notice.error ? 'error-toast' : ''}`}><span>{notice.error ? <Radio size={17}/> : <CheckCircle2 size={17}/>}</span><p>{notice.text}</p>{notice.retry && <button className="text-button" disabled={working} onClick={notice.retry}>重试</button>}<button className="icon-button" aria-label="关闭提示" onClick={() => setNotice(null)}><X size={16}/></button></div>}
-    {job && processing && <div className="job-panel" role="status"><div><LoaderCircle className="spin" size={17}/><strong>{job.title}</strong><span>{job.progress}%</span><button className="text-button" onClick={() => void cancel()}>取消</button></div><progress max="100" value={job.progress}/><small>{job.message}</small></div>}
-    {cropAsset && <CropEditor asset={cropAsset} busy={working} close={() => setCropAsset(null)} save={edits => void perform(async () => { const item = await run<MediaAsset>('edit', { id: cropAsset.id, edits }); const current = draftRef.current; if (current) change({ items: current.items.map(i => i.id === cropAsset.id ? item : i) }); setCropAsset(null); })}/>}
-    {videoOpen && <VideoTool source={videoSource} setSource={setVideoSource} busy={working} run={run} perform={action => void perform(action)} add={asset => { addItems([asset]); setNotice({ text: '素材已加入当前草稿' }); }} close={() => setVideoOpen(false)}/>}
-    {exportOpen && <Modal title={exportResult ? '这一篇，已经整理好了' : '导出发布素材包'} eyebrow="READY TO SHARE" onClose={() => setExportOpen(false)} busy={working}>
-      {exportResult ? <div className="export-success"><div className="success-seal"><Check size={32}/></div><h3>素材包已保存</h3><p>图片按顺序编号，文案单独保存。<br/>传到手机后，就可以继续发布了。</p><div className="destination-path">{exportResult}</div><button className="primary" onClick={() => void perform(() => window.desktop.reveal(exportResult))}><FolderOpen size={17}/>打开文件位置</button>{hasLive && <p className="small muted">实况手机兼容性待验证，请先阅读包内的导入说明。</p>}</div>
-        : <><div className="export-content"><div className="export-summary"><div className="feature-icon"><Images size={25}/></div><div><strong>{draft?.title || '未命名草稿'}</strong><p>{draft?.items.length} 个素材 · 独立文案 · 按序编号</p></div></div><label className="field-label">保存位置</label><div className="directory-picker"><span className={!exportDirectory ? 'muted' : ''}>{exportDirectory || '选择一个存放素材的文件夹'}</span><button className="secondary" disabled={working} onClick={() => void perform(async () => { const directory = await window.desktop.pickDirectory(); if (directory) setExportDirectory(directory); })}><FolderOpen size={15}/>选择位置</button></div><label className="field-label">导出方式</label><div className="export-format-options"><button disabled={working} className={exportFormat === 'folder' ? 'selected' : ''} onClick={() => setExportFormat('folder')}><FolderOpen size={21}/><strong>素材文件夹</strong><span>方便查看与选择图片</span></button><button disabled={working} className={exportFormat === 'zip' ? 'selected' : ''} onClick={() => setExportFormat('zip')}><Download size={21}/><strong>ZIP 压缩包</strong><span>方便整体传输与归档</span></button></div>
-          {hasLive && <><label className="field-label">实况目标设备</label><div className="button-row">{([['apple', 'iPhone 实况'], ['android', '标准安卓实况']] as const).map(([target, label]) => <label className="checkbox-label" key={target}><input type="checkbox" disabled={working} checked={targets.includes(target)} onChange={e => setTargets(e.target.checked ? [...targets, target] : targets.filter(t => t !== target))}/>{label}</label>)}</div><p className="notice-box">手机相册兼容性待真机验证。iPhone 需用支持配对文件的工具导入；标准安卓格式需兼容的相册。素材包内附具体指引。</p></>}
-          <p className="small muted">同名文件会自动另存，已有素材不会被覆盖。</p></div><footer className="modal-footer"><button className="secondary" disabled={working} onClick={() => setExportOpen(false)}>取消</button><button className="primary" disabled={working || !exportDirectory || (!!hasLive && !targets.length)} onClick={doExport}><Download size={16}/>{working ? '正在导出…' : '开始导出'}</button></footer></>}
+    {notice && <div role={notice.error ? 'alert' : 'status'} className="notification">
+      <p>{notice.error ? '失败：' : ''}{notice.text}</p>
+      {notice.retry && <button disabled={working} onClick={notice.retry}>重试</button>}
+      <button onClick={() => setNotice(null)}>关闭提示</button>
+    </div>}
+    {job && processing && <div className="job-panel" role="status">
+      <p>{job.title} · {job.progress}%</p>
+      <progress aria-label="任务进度" max="100" value={job.progress}/>
+      <p>{job.message}</p><button onClick={() => void cancel()}>取消任务</button>
+    </div>}
+    {cropAsset && <CropEditor asset={cropAsset} busy={working} close={() => setCropAsset(null)} save={edits => void perform(async () => {
+      const item = await run<MediaAsset>('edit', { id: cropAsset.id, edits });
+      const current = draftRef.current; if (current) change({ items: current.items.map(i => i.id === cropAsset.id ? item : i) });
+      setCropAsset(null);
+    })}/>}
+    {videoOpen && <VideoTool source={videoSource} setSource={setVideoSource} busy={working} run={run}
+      perform={action => void perform(action)} add={asset => { addItems([asset]); setNotice({ text: '素材已加入当前草稿' }); }} close={() => setVideoOpen(false)}/>}
+    {exportOpen && <Modal title={exportResult ? '导出完成' : '导出发布素材包'} onClose={() => setExportOpen(false)} busy={working}>
+      {exportResult ? <div className="export-success">
+        <h3>素材包已保存</h3><p>图片按顺序编号，文案单独保存。</p>
+        <p className="destination-path">{exportResult}</p>
+        <button onClick={() => void perform(() => window.desktop.reveal(exportResult))}>打开文件位置</button>
+        {hasLive && <p>实况手机兼容性待验证，请先阅读包内的导入说明。</p>}
+      </div> : <>
+        <p>{draft?.title || '未命名草稿'} · {draft?.items.length} 个素材</p>
+        <fieldset><legend>保存位置</legend>
+          <p className="destination-path">{exportDirectory || '尚未选择文件夹'}</p>
+          <button disabled={working} onClick={() => void perform(async () => { const directory = await window.desktop.pickDirectory(); if (directory) setExportDirectory(directory); })}>选择位置</button>
+        </fieldset>
+        <fieldset><legend>导出方式</legend><div className="controls">
+          <button disabled={working} aria-pressed={exportFormat === 'folder'} onClick={() => setExportFormat('folder')}>素材文件夹</button>
+          <button disabled={working} aria-pressed={exportFormat === 'zip'} onClick={() => setExportFormat('zip')}>ZIP 压缩包</button>
+        </div></fieldset>
+        {hasLive && <fieldset><legend>实况目标设备</legend><div className="controls">
+          {([['apple', 'iPhone 实况'], ['android', '标准安卓实况']] as const).map(([target, label]) =>
+            <label key={target}><input type="checkbox" disabled={working} checked={targets.includes(target)}
+              onChange={e => setTargets(e.target.checked ? [...targets, target] : targets.filter(t => t !== target))}/>{label}</label>
+          )}
+        </div><p>手机相册兼容性待真机验证。iPhone 需用支持配对文件的工具导入；标准安卓格式需兼容的相册。素材包内附具体指引。</p></fieldset>}
+        <p>同名文件会自动另存，已有素材不会被覆盖。</p>
+        <footer className="modal-footer">
+          <button disabled={working} onClick={() => setExportOpen(false)}>取消</button>
+          <button disabled={working || !exportDirectory || (!!hasLive && !targets.length)} onClick={doExport}>{working ? '正在导出…' : '开始导出'}</button>
+        </footer>
+      </>}
     </Modal>}
-    {about && <Modal title="片语 · 使用与存储" eyebrow="YOUR PRIVATE WORKSPACE" onClose={() => setAbout(false)}><div className="about-content"><p>整理配图与独立文案，在预览中确认效果，再把素材带到手机发布。</p><ol><li>添加图片，或从视频中截取画面与实况。</li><li>调整顺序与画面，编辑发布文案。</li><li>在右侧检查效果，导出文件夹或 ZIP。</li></ol><h3>本地资料库</h3><p>草稿自动保存，导入素材复制到资料库。删除草稿不会删除原始文件。请在应用关闭时备份整个资料库。</p><div className="destination-path">{info?.dataDirectory || '正在读取…'}</div><p className="notice-box">iPhone 与标准安卓实况的文件结构经过程序校验，真机兼容性仍待验证。第三方平台是否接受实况，请在手机上确认。</p><button className="secondary" onClick={() => void perform(() => window.desktop.openHelp())}><FileText size={16}/>完整使用说明</button><div className="about-version">版本 {info?.version || '0.1.0'} · 本地桌面应用</div></div></Modal>}
-    {deleteConfirm && <Modal title="删除这份草稿？" onClose={() => setDeleteConfirm(false)} busy={working}><div className="export-content"><p>将删除「{draft?.title}」的文案与素材排列，导入的原始文件不会被删除。</p></div><footer className="modal-footer"><button className="secondary" onClick={() => setDeleteConfirm(false)} disabled={working}>保留草稿</button><button className="danger-button" disabled={working} onClick={() => void perform(async () => { await flush(); if (!draft) return; await window.desktop.deleteDraft(draft.id); const remaining = drafts.filter(d => d.id !== draft.id); setDrafts(remaining); show(remaining[0] || null); setDeleteConfirm(false); })}><Trash2 size={15}/>删除草稿</button></footer></Modal>}
+    {about && <Modal title="片语 · 使用与存储" onClose={() => setAbout(false)}>
+      <ol><li>添加图片，或从视频中截取画面与实况。</li><li>调整顺序与画面，编辑发布文案。</li><li>在右侧检查效果，导出文件夹或 ZIP。</li></ol>
+      <h3>本地资料库</h3>
+      <p>草稿自动保存，导入素材复制到资料库。删除草稿不会删除原始文件。请在应用关闭时备份整个资料库。</p>
+      <p className="destination-path">{info?.dataDirectory || '正在读取…'}</p>
+      <p>iPhone 与标准安卓实况的文件结构经过程序校验，真机兼容性仍待验证。</p>
+      <button onClick={() => void perform(() => window.desktop.openHelp())}>完整使用说明</button>
+      <p>版本 {info?.version || '正在读取…'} · 本地桌面应用</p>
+    </Modal>}
+    {deleteConfirm && <Modal title="删除这份草稿？" onClose={() => setDeleteConfirm(false)} busy={working}>
+      <p>将删除「{draft?.title}」的文案与素材排列，导入的原始文件不会被删除。</p>
+      <footer className="modal-footer">
+        <button onClick={() => setDeleteConfirm(false)} disabled={working}>保留草稿</button>
+        <button disabled={working} onClick={() => void perform(async () => {
+          await flush(); if (!draft) return;
+          await window.desktop.deleteDraft(draft.id);
+          const remaining = drafts.filter(d => d.id !== draft.id); setDrafts(remaining); show(remaining[0] || null); setDeleteConfirm(false);
+        })}>删除草稿</button>
+      </footer>
+    </Modal>}
   </div>;
 }

@@ -55,6 +55,7 @@ try {
   assert.notEqual(await cards().first().locator('img').getAttribute('src'), firstSource); record('Keyboard-accessible reordering changes material order');
   await page.getByRole('button', { name: '编辑第 1 张图片', exact: true }).click();
   await page.getByRole('button', { name: '1:1', exact: true }).click();
+  await page.screenshot({ path: path.join(output, '06-crop-editor.png') });
   await page.getByRole('button', { name: '应用调整', exact: true }).click();
   await page.getByRole('dialog', { name: '调整画面' }).waitFor({ state: 'hidden' });
   assert.match(await cards().first().innerText(), /900 × 900/); record('Crop editor applies dimensions to preview and stored rendition');
@@ -67,11 +68,27 @@ try {
   assert.equal(await page.locator('.image-counter').innerText(), '2 / 3'); record('Douyin carousel selects the next image');
   assert.equal(await page.locator('.layout-caption').innerText(), caption);
   await page.screenshot({ path: path.join(output, '03-douyin-preview.png') });
+  await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1080, 720));
+  await waitFor(async () => await page.evaluate(() => window.innerWidth <= 1080));
+  const viewport = await page.evaluate(() => {
+    const button = [...document.querySelectorAll('.export-bar button')][0];
+    const box = button.getBoundingClientRect();
+    const target = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+    return { fits: document.documentElement.scrollWidth <= window.innerWidth, exportVisible: box.left >= 0 && box.right <= window.innerWidth && box.bottom <= window.innerHeight, exportUnobstructed: button.contains(target) };
+  });
+  assert.equal(viewport.fits, true); assert.equal(viewport.exportVisible, true); assert.equal(viewport.exportUnobstructed, true);
+  await page.screenshot({ path: path.join(output, '07-minimum-window.png') });
+  await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1440, 930));
+  record('Minimum desktop window retains accessible export controls without horizontal overflow');
   await page.getByRole('button', { name: '复制草稿', exact: true }).click();
   await waitFor(async () => (await title.inputValue()).endsWith('副本'));
   await page.getByRole('textbox', { name: '搜索草稿', exact: true }).fill('没有这个标题');
   assert.equal(await page.locator('.draft-card').count(), 0);
   await page.getByRole('button', { name: '清空搜索', exact: true }).click();
+  await page.getByRole('button', { name: '删除草稿', exact: true }).click();
+  await page.getByRole('dialog', { name: '删除这份草稿？' }).getByRole('button', { name: '删除草稿', exact: true }).click();
+  await waitFor(async () => await page.locator('.draft-card').count() === 1);
+  record('Draft deletion keeps its confirmation dialog and preserves the original draft');
   await page.locator('.draft-card').filter({ hasText: '海边的慢日子' }).filter({ hasNotText: '副本' }).click();
   await waitFor(async () => await title.inputValue() === '海边的慢日子'); record('Draft duplication, search and switching retain content');
   await page.getByRole('button', { name: '从视频取材', exact: true }).click();

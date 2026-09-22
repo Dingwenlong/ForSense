@@ -4,8 +4,6 @@ This application includes open-source components. Their original copyright and l
 
 - Electron — MIT; Chromium / Node.js and other bundled components: see LICENSE and LICENSES.chromium.html beside the application executable. https://github.com/electron/electron
 - React / React DOM — MIT. https://github.com/facebook/react
-- Lucide icons — ISC. https://github.com/lucide-icons/lucide
-- Noto Sans SC — SIL Open Font License 1.1. https://github.com/notofonts/noto-cjk
 - Zod — MIT. https://github.com/colinhacks/zod
 - yazl and buffer-crc32 — MIT. https://github.com/thejoshwolfe/yazl
 - electron-squirrel-startup — Apache-2.0. https://github.com/mongodb-js/electron-squirrel-startup

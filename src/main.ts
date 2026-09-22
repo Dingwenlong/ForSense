@@ -73,7 +73,7 @@ if (ownsLock && !started) app.whenReady().then(async () => {
   });
   register('app:info', () => ({ version: app.getVersion(), dataDirectory: root, compatibility: 'iPhone / Android 真机兼容性待验证' }));
   register('app:close-ready', async () => { service.cancelAll(); await service.waitForIdle(); readyToClose = true; window?.close(); });
-  window = new BrowserWindow({ width: 1440, height: 930, minWidth: 1080, minHeight: 720, backgroundColor: '#f6f5f0', title: '片语 · 图文工作台', icon: app.isPackaged ? path.join(process.resourcesPath, 'icon.ico') : path.join(app.getAppPath(), 'resources/icon.ico'), show: false,
+  window = new BrowserWindow({ width: 1440, height: 930, minWidth: 1080, minHeight: 720, backgroundColor: '#ffffff', title: '片语 · 图文工作台', icon: app.isPackaged ? path.join(process.resourcesPath, 'icon.ico') : path.join(app.getAppPath(), 'resources/icon.ico'), show: false,
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, spellcheck: false, webSecurity: true } });
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('will-navigate', event => event.preventDefault());
