@@ -71,7 +71,7 @@ export function App() {
     <header className="app-header">
       <strong>片语</strong>
       {page === 'workbench' && <button disabled={working} onClick={backToLibrary}>返回草稿列表</button>}
-      <span>{page === 'library' ? '草稿列表' : (draft?.title || '未命名草稿')}</span>
+      <span>{page === 'library' ? '草稿列表' : '预览工作台'}</span>
       <span role="status">{page === 'library' ? '本地保存' : saveStatus}</span>
       <button onClick={() => setAbout(true)}>使用与存储</button>
     </header>

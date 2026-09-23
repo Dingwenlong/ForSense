@@ -16,7 +16,6 @@ img, video { max-width: 100%; }
 .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .field-label { display: block; margin: 12px 0; }
 .field-label > input { display: block; width: 100%; margin-top: 4px; }
-.caption-input { display: block; width: 100%; min-height: min(55vh, 480px); resize: vertical; }
 .destination-path, .layout-caption { overflow-wrap: anywhere; }
 
 /* Library and live preview workbench. */
@@ -36,28 +35,18 @@ img, video { max-width: 100%; }
 .library-card > span:nth-child(2) { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .library-card > img { width: 45px; height: 55px; object-fit: cover; flex-shrink: 0; }
 
-/* Editing tools stay beside the existing preview and share the same draft state. */
-.workbench-page { display: grid; grid-template-columns: 350px minmax(0, 1fr); height: 100%; min-height: 0; }
-.workbench-editor { display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 12px; border-right: 1px solid GrayText; }
-.workbench-editor-head { flex-shrink: 0; }
-.workbench-editor-head h2 { margin-top: 0; }
-.editor-tabs { margin: 12px 0; }
-.workbench-editor-scroll { flex: 1; min-height: 0; overflow: auto; }
-.workbench-editor-scroll > section { min-height: 100%; }
-.workbench-editor-scroll .caption-input { min-height: 250px; }
-.draft-operations { flex-shrink: 0; border-top: 1px solid GrayText; padding-top: 10px; }
+/* A small toolbar surrounds the preview; editing happens in the preview card. */
+.workbench-page { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.workbench-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 10px 14px; border-bottom: 1px solid GrayText; }
+.workbench-toolbar label { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.workbench-toolbar input { min-width: 0; width: 210px; }
+.workbench-toolbar select { min-width: 110px; }
+.workbench-toolbar > button:last-child { margin-left: auto; }
 .draft-operations .controls { margin-top: 8px; }
 .workbench-preview { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .workbench-preview-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 10px 14px; border-bottom: 1px solid GrayText; }
 .workbench-preview-head h1 { margin: 0 0 3px; }
 .workbench-preview-scroll { flex: 1; min-height: 0; overflow: auto; padding: 14px; }
-.asset-list { display: grid; gap: 8px; margin-top: 12px; }
-.asset-card { display: grid; grid-template-columns: 78px minmax(0, 1fr); gap: 8px; min-width: 0; border-bottom: 1px solid GrayText; padding-bottom: 8px; }
-.asset-card:focus-visible { outline: 2px solid Highlight; outline-offset: -2px; }
-.asset-card > img { width: 78px; height: 86px; object-fit: cover; display: block; }
-.asset-details { min-width: 0; }
-.asset-live { font-weight: bold; }
-.empty-dropzone { width: 100%; min-height: 95px; margin-top: 12px; }
 
 /* The platform preview cards below keep their previous appearance. */
 .layout-caption { white-space: pre-wrap; }
@@ -67,10 +56,13 @@ img, video { max-width: 100%; }
 .wechat-proof { width: min(100%, 520px); margin: 0 auto; background: #fff; color: #1f2328; border: 1px solid #dedfe2; }
 .wechat-proof__header { display: flex; justify-content: space-between; align-items: center; min-height: 64px; padding: 10px 18px; font-size: 17px; }
 .wechat-proof__publish { background: #08b465; color: #fff; padding: 7px 15px; border-radius: 6px; font-weight: 600; }
-.wechat-proof__caption { min-height: 152px; margin: 0; padding: 28px 22px 16px; font-size: 17px; line-height: 1.6; }
-.wechat-proof__placeholder { color: #a5a7aa; }
+.wechat-proof__caption { display: block; width: 100%; min-height: 152px; margin: 0; padding: 28px 22px 16px; border: 0; background: transparent; resize: none; overflow: hidden; color: inherit; font-size: 17px; line-height: 1.6; }
+.wechat-proof__caption::placeholder { color: #a5a7aa; }
 .wechat-proof__photos { padding: 0 18px 28px; }
 .wechat-proof__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+.wechat-proof__add { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; width: 100%; aspect-ratio: 1; padding: 0; border: 1px dashed #9ca3ab; background: #f8f9fa; color: #4d555e; font-size: 28px; }
+.wechat-proof__add small { font-size: 11px; }
+.wechat-proof__add-below { margin-top: 9px; }
 .wechat-proof__tile { position: relative; min-width: 0; aspect-ratio: 1; }
 .wechat-proof__photo { display: block; width: 100%; height: 100%; padding: 0; border: 0; background: #eef0f2; overflow: hidden; cursor: grab; }
 .wechat-proof__photo:active { cursor: grabbing; }
@@ -107,6 +99,9 @@ img, video { max-width: 100%; }
 .douyin-proof__next { right: 6px; }
 .douyin-proof__previous:disabled, .douyin-proof__next:disabled { opacity: .3; }
 .douyin-proof__motion { position: absolute; right: 10px; bottom: 28px; background: rgb(0 0 0 / 70%); color: white; border: 0; border-radius: 4px; }
+.douyin-proof__add { position: absolute; right: 11px; top: 49px; width: 34px; height: 34px; padding: 0; border: 1px dashed #aab0b6; background: #fff; color: #50565c; font-size: 23px; line-height: 1; }
+.douyin-proof__add-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; width: 100px; height: 100px; border: 1px dashed #aab0b6; background: #fff; font-size: 28px; }
+.douyin-proof__add-empty small { font-size: 11px; }
 .douyin-proof__segments { position: absolute; left: 12px; right: 12px; bottom: 0; display: flex; align-items: flex-end; gap: 4px; min-height: 32px; padding-bottom: 11px; }
 .douyin-proof__segments span { height: 3px; flex: 1; border-radius: 3px; background: rgb(255 255 255 / 52%); box-shadow: 0 1px 2px rgb(0 0 0 / 30%); }
 .douyin-proof__segments span.seen { background: white; }
@@ -117,6 +112,8 @@ img, video { max-width: 100%; }
 .douyin-proof__topic > span { flex-shrink: 0; color: #74777d; }
 .douyin-proof__copy { padding: 14px 16px 16px; }
 .douyin-proof__caption { margin: 0; font-size: 16px; line-height: 1.75; }
+.douyin-proof__caption[role="button"] { cursor: text; }
+.douyin-proof__caption-editor { display: block; width: 100%; min-height: 76px; padding: 0; border: 0; background: transparent; resize: none; overflow: hidden; color: inherit; font-size: 16px; line-height: 1.75; }
 .douyin-proof__hashtag { color: #245b83; }
 .douyin-proof__related { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; margin-top: 16px; font-size: 13px; }
 .douyin-proof__search-chip { display: inline-flex; align-items: center; gap: 5px; min-width: 0; max-width: 100%; padding: 5px 9px; border-radius: 5px; background: #f5f6f7; overflow-wrap: anywhere; }
@@ -169,8 +166,7 @@ img, video { max-width: 100%; }
 
 @media (max-width: 850px) {
   .app-header { flex-wrap: wrap; }
-  .workbench-page, .video-workspace { display: block; height: auto; }
-  .workbench-editor { border-right: 0; border-bottom: 1px solid GrayText; }
-  .workbench-editor-scroll { max-height: 420px; }
+  .workbench-page { height: auto; }
+  .video-workspace { display: block; }
   .workbench-preview-scroll { max-height: 800px; }
 }

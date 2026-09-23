@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import type { Draft, MediaAsset } from '../shared/types';
 import { acceptsPreviewDrag, beginPreviewDrag, previewDragSource } from './previewDrag';
 
@@ -13,15 +13,22 @@ function Glyph({ kind }: { kind: 'search' | 'heart' | 'comment' | 'star' | 'shar
   </svg>;
 }
 
-export function DouyinPreview({ draft, busy, current, index, playing, setPlaying, onEdit, onReorder, next }: {
+export function DouyinPreview({ draft, busy, current, index, playing, setPlaying, onEdit, onReorder, onAddImages, onCaptionChange, next }: {
   draft: Draft; busy: boolean; current: MediaAsset | undefined; index: number; playing: boolean;
   setPlaying: (value: boolean) => void; onEdit: (asset: MediaAsset) => void;
-  onReorder: (from: number, to: number) => void; next: (direction: number) => void;
+  onReorder: (from: number, to: number) => void; onAddImages: () => void;
+  onCaptionChange: (caption: string) => void; next: (direction: number) => void;
 }) {
   const [dropIndex, setDropIndex] = useState<number | null>(null);
+  const [editingCaption, setEditingCaption] = useState(false);
   const suppressClick = useRef(false);
+  const captionRef = useRef<HTMLTextAreaElement>(null);
   const tags = [...new Set([...draft.caption.matchAll(/#[^\s#]+/gu)].map(match => match[0]))];
   const captionParts = draft.caption.split(/(#[^\s#]+)/gu);
+  useLayoutEffect(() => {
+    const field = captionRef.current; if (!field) return;
+    field.style.height = 'auto'; field.style.height = `${Math.max(76, field.scrollHeight)}px`;
+  }, [draft.caption, editingCaption]);
   const targetOnBar = (clientX: number, left: number, width: number) =>
     Math.max(0, Math.min(draft.items.length - 1, Math.floor(((clientX - left) / width) * draft.items.length)));
   const targetOnStage = (clientX: number, left: number, width: number) =>
@@ -40,6 +47,11 @@ export function DouyinPreview({ draft, busy, current, index, playing, setPlaying
       onDrop={event => { if (busy) return; const from = previewDragSource(event, draft); if (from < 0) return; event.preventDefault(); event.stopPropagation(); const rect = event.currentTarget.getBoundingClientRect(); const to = targetOnStage(event.clientX, rect.left, rect.width); setDropIndex(null); if (from !== to) onReorder(from, to); }}
       onKeyDown={event => {
         if (draft.items.length < 2) return;
+        if (event.altKey && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
+          event.preventDefault(); const to = Math.max(0, Math.min(draft.items.length - 1, index + (event.key === 'ArrowLeft' ? -1 : 1)));
+          if (to !== index) onReorder(index, to);
+          return;
+        }
         if (event.key === 'ArrowLeft') { event.preventDefault(); next(-1); }
         if (event.key === 'ArrowRight') { event.preventDefault(); next(1); }
       }}>
@@ -57,20 +69,26 @@ export function DouyinPreview({ draft, busy, current, index, playing, setPlaying
           <button className="douyin-proof__next" aria-label="下一张" onClick={() => next(1)} disabled={index === draft.items.length - 1}>›</button>
         </>}
         {current.kind === 'live' && <button className="douyin-proof__motion" onClick={() => setPlaying(!playing)}>{playing ? '暂停实况' : '播放实况'}</button>}
+        <button className="douyin-proof__add" aria-label="添加图片" onClick={onAddImages} disabled={busy}>＋</button>
         <div className="douyin-proof__segments" aria-label={`第 ${index + 1} 张，共 ${draft.items.length} 张`}
           onDragOver={event => { if (busy || !acceptsPreviewDrag(event)) return; event.preventDefault(); event.stopPropagation(); event.dataTransfer.dropEffect = 'move'; const rect = event.currentTarget.getBoundingClientRect(); setDropIndex(targetOnBar(event.clientX, rect.left, rect.width)); }}
           onDrop={event => { if (busy) return; const from = previewDragSource(event, draft); if (from < 0) return; event.preventDefault(); event.stopPropagation(); const rect = event.currentTarget.getBoundingClientRect(); const to = targetOnBar(event.clientX, rect.left, rect.width); setDropIndex(null); if (from !== to) onReorder(from, to); }}>
           {draft.items.length <= 18 ? draft.items.map((item, position) => <span key={item.id} className={`${position <= index ? 'seen' : ''} ${position === dropIndex ? 'drop-target' : ''}`}/> )
             : <progress max={draft.items.length} value={index + 1}/>}
         </div>
-      </> : <p className="douyin-proof__empty">（暂无图片）</p>}
+      </> : <button className="douyin-proof__add-empty" aria-label="添加图片" onClick={onAddImages} disabled={busy}>＋<small>添加图片</small></button>}
     </div>
     {tags.length > 0 && <div className="douyin-proof__topic"><strong># {tags[0].slice(1)}</strong><span>话题预览</span></div>}
     <div className="douyin-proof__copy">
-      <p className="layout-caption douyin-proof__caption">
-        {draft.caption ? captionParts.map((part, position) => part.startsWith('#') ?
-          <span className="douyin-proof__hashtag" key={position}>{part}</span> : part) : '（暂无文案）'}
-      </p>
+      {editingCaption ? <textarea ref={captionRef} autoFocus className="layout-caption douyin-proof__caption-editor" aria-label="发布文案"
+          value={draft.caption} placeholder="点击输入文案" disabled={busy} maxLength={100000}
+          onChange={event => onCaptionChange(event.target.value)} onBlur={() => setEditingCaption(false)}/>
+        : <p className="layout-caption douyin-proof__caption" role="button" tabIndex={0} aria-label="编辑发布文案"
+            onClick={() => setEditingCaption(true)}
+            onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setEditingCaption(true); } }}>
+            {draft.caption ? captionParts.map((part, position) => part.startsWith('#') ?
+              <span className="douyin-proof__hashtag" key={position}>{part}</span> : part) : '点击输入文案'}
+          </p>}
       {tags.length > 0 && <div className="douyin-proof__related"><span>相关搜索</span><span className="douyin-proof__search-chip"><Glyph kind="search"/>{tags[0].slice(1)}</span></div>}
     </div>
     <div className="douyin-proof__footer" aria-label="互动区域示意">

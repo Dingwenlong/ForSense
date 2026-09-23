@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import type { Draft, MediaAsset } from '../shared/types';
 import { acceptsPreviewDrag, beginPreviewDrag, previewDragSource } from './previewDrag';
 
@@ -10,25 +10,37 @@ function SettingIcon({ kind }: { kind: 'location' | 'mention' | 'audience' }) {
   </svg>;
 }
 
-export function WechatPreview({ draft, busy, onEdit, onReorder, onPlay }: {
+export function WechatPreview({ draft, busy, onEdit, onReorder, onPlay, onAddImages, onCaptionChange }: {
   draft: Draft; busy: boolean; onEdit: (asset: MediaAsset) => void;
   onReorder: (from: number, to: number) => void; onPlay: (asset: MediaAsset) => void;
+  onAddImages: () => void; onCaptionChange: (caption: string) => void;
 }) {
   const [dropIndex, setDropIndex] = useState<number | null>(null);
   const suppressClick = useRef(false);
+  const captionRef = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const field = captionRef.current; if (!field) return;
+    field.style.height = 'auto'; field.style.height = `${Math.max(152, field.scrollHeight)}px`;
+  }, [draft.caption]);
   return <div className="wechat-proof" aria-label="微信朋友圈发表排版预览">
     <div className="wechat-proof__header" aria-label="发表栏示意">
       <span>取消</span><span className="wechat-proof__publish">发表</span>
     </div>
-    <p className={`layout-caption wechat-proof__caption ${draft.caption ? '' : 'wechat-proof__placeholder'}`}>
-      {draft.caption || '这一刻的想法…'}
-    </p>
+    <textarea ref={captionRef} className="layout-caption wechat-proof__caption" aria-label="发布文案"
+      value={draft.caption} placeholder="这一刻的想法…" disabled={busy} maxLength={100000}
+      onChange={event => onCaptionChange(event.target.value)}/>
     <div className="wechat-proof__photos" aria-label="朋友圈图片九宫格">
-      {draft.items.length ? <div className="wechat-proof__grid">
+      <div className="wechat-proof__grid">
         {draft.items.slice(0, 9).map((item, position) => <div key={item.id} className="wechat-proof__tile">
           <button className={`preview-image wechat-proof__photo ${dropIndex === position ? 'drop-target' : ''}`}
             draggable={!busy} disabled={busy} aria-label={`编辑第 ${position + 1} 张：${item.name}`}
             onClick={() => { if (!suppressClick.current) onEdit(item); }}
+            onKeyDown={event => {
+              if (busy || !event.altKey) return;
+              const offset = event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : event.key === 'ArrowUp' ? -3 : event.key === 'ArrowDown' ? 3 : 0;
+              const target = position + offset;
+              if (offset && target >= 0 && target < draft.items.length) { event.preventDefault(); onReorder(position, target); }
+            }}
             onDragStart={event => { suppressClick.current = true; beginPreviewDrag(event, item.id); }}
             onDragEnd={() => { setDropIndex(null); window.setTimeout(() => { suppressClick.current = false; }, 0); }}
             onDragOver={event => { if (busy || !acceptsPreviewDrag(event)) return; event.preventDefault(); event.dataTransfer.dropEffect = 'move'; setDropIndex(position); }}
@@ -38,7 +50,9 @@ export function WechatPreview({ draft, busy, onEdit, onReorder, onPlay }: {
           </button>
           {item.kind === 'live' && <button className="wechat-proof__live" onClick={() => onPlay(item)} aria-label={`播放第 ${position + 1} 张实况`}>实况 ▶</button>}
         </div>)}
-      </div> : <p className="wechat-proof__empty">（暂无图片）</p>}
+        {draft.items.length < 9 && <button className="wechat-proof__add" onClick={onAddImages} disabled={busy} aria-label="添加图片">＋<small>添加图片</small></button>}
+      </div>
+      {draft.items.length >= 9 && <button className="wechat-proof__add-below" onClick={onAddImages} disabled={busy}>＋ 添加图片</button>}
       {draft.items.length > 9 && <p className="wechat-proof__overflow">九宫格预览前 9 张；草稿共 {draft.items.length} 张，导出保留全部素材。</p>}
     </div>
     <div className="wechat-proof__settings" aria-label="发布设置示意">
