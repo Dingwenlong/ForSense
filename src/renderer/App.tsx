@@ -1,18 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Draft, MediaAsset, VideoSource } from '../shared/types';
 import { useJobs, errorText } from './hooks';
-import { Preview } from './Preview';
 import { Modal } from './Modal';
 import { CropEditor } from './CropEditor';
 import { VideoTool } from './VideoTool';
+import { LibraryPage, MediaPage, CaptionPage, ReviewPage, type WorkPage } from './pages';
 
 export function App() {
-  const [drafts, setDrafts] = useState<Draft[]>([]), [draft, setDraft] = useState<Draft | null>(null), [filter, setFilter] = useState('all'), [query, setQuery] = useState('');
+  const [drafts, setDrafts] = useState<Draft[]>([]), [draft, setDraft] = useState<Draft | null>(null), [page, setPage] = useState<WorkPage>('library'), [filter, setFilter] = useState<'all' | 'moments' | 'douyin'>('all'), [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false), [loading, setLoading] = useState(true), [saveStatus, setSaveStatus] = useState('已保存');
   const [notice, setNotice] = useState<{ text: string; error?: boolean; retry?: () => void } | null>(null);
   const [cropAsset, setCropAsset] = useState<MediaAsset | null>(null), [videoOpen, setVideoOpen] = useState(false), [videoSource, setVideoSource] = useState<VideoSource | null>(null);
   const [exportOpen, setExportOpen] = useState(false), [exportDirectory, setExportDirectory] = useState(''), [exportFormat, setExportFormat] = useState<'folder' | 'zip'>('folder'), [targets, setTargets] = useState<('apple' | 'android')[]>(['apple', 'android']);
-  const [exportResult, setExportResult] = useState<string | null>(null), [about, setAbout] = useState(false), [deleteConfirm, setDeleteConfirm] = useState(false), [dragging, setDragging] = useState(false);
+  const [exportResult, setExportResult] = useState<string | null>(null), [about, setAbout] = useState(false), [deleteConfirm, setDeleteConfirm] = useState(false);
   const [info, setInfo] = useState<{ version: string; dataDirectory: string; compatibility: string } | null>(null);
   const draftRef = useRef<Draft | null>(null), timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined), revision = useRef(0), dirty = useRef(false), saveQueue = useRef<Promise<unknown>>(Promise.resolve()), dragged = useRef<number | null>(null);
   const { run, job, processing, cancel } = useJobs();
@@ -42,8 +42,7 @@ export function App() {
     window.desktop.listDrafts().then(async result => {
       if (!active) return;
       if (result.warnings.length) setNotice({ text: result.warnings.join('；'), error: true });
-      if (result.drafts.length) { setDrafts(result.drafts); show(result.drafts[0]); }
-      else { const first = await window.desktop.createDraft('moments'); if (active) { setDrafts([first]); show(first); } }
+      setDrafts(result.drafts);
     }).catch(error => setNotice({ text: errorText(error), error: true })).finally(() => setLoading(false));
     void window.desktop.getInfo().then(setInfo);
     const off = window.desktop.onClose(() => { void flushRef.current().then(() => window.desktop.closeReady()).catch(error => setNotice({ text: '草稿未保存，已保留窗口：' + errorText(error), error: true })); });
@@ -56,8 +55,9 @@ export function App() {
     catch (error) { const text = errorText(error); if (!text.includes('取消')) setNotice({ text, error: true, retry: () => void perform(action) }); }
     finally { setBusy(false); }
   }
-  const select = (item: Draft) => { void perform(async () => { await flush(); show(item); }); };
-  const newDraft = () => { void perform(async () => { await flush(); const next = await window.desktop.createDraft(filter === 'douyin' ? 'douyin' : 'moments'); updateList(next); show(next); setQuery(''); }); };
+  const select = (item: Draft) => { void perform(async () => { await flush(); show(item); setPage('media'); }); };
+  const newDraft = (platform: Draft['platform']) => { void perform(async () => { await flush(); const next = await window.desktop.createDraft(platform); updateList(next); show(next); setQuery(''); setPage('media'); }); };
+  const navigate = (next: WorkPage) => { if (working) return; void perform(async () => { await flush(); setPage(next); }); };
   const addItems = (items: MediaAsset[]) => { const current = draftRef.current; if (current) { if (current.items.length + items.length > 200) throw new Error('每份草稿最多整理 200 个素材，请新建草稿继续添加'); change({ items: [...current.items, ...items] }); } };
   const importFiles = (paths?: string[]) => { void perform(async () => { const selected = paths || await window.desktop.pickImages(); if (!selected.length) return; if ((draftRef.current?.items.length || 0) + selected.length > 200) throw new Error('每份草稿最多整理 200 个素材，请分成多份草稿'); const items = await run<MediaAsset[]>('images', selected); addItems(items); setNotice({ text: `已加入 ${items.length} 张图片` }); }); };
   function reorder(from: number, to: number) { if (!draft || from === to || from < 0 || to < 0 || to >= draft.items.length) return; const items = [...draft.items]; const [item] = items.splice(from, 1); items.splice(to, 0, item); change({ items }); }
@@ -65,121 +65,38 @@ export function App() {
     await flush(); if (!draftRef.current || !exportDirectory) return;
     const result = await run<{ path: string }>('export', { draftId: draftRef.current.id, directory: exportDirectory, format: exportFormat, targets }); setExportResult(result.path);
   }); };
-  const filtered = drafts.filter(d => (filter === 'all' || d.platform === filter) && `${d.title} ${d.caption}`.toLowerCase().includes(query.toLowerCase()));
   const hasLive = draft?.items.some(item => item.kind === 'live');
   return <div className="app-shell">
-    <aside className="sidebar">
-      <h1>片语</h1>
-      <button onClick={newDraft} disabled={working || loading}>新建图文</button>
-      <fieldset className="platform-nav">
-        <legend>草稿分类</legend>
-        {([['all', '全部草稿'], ['moments', '朋友圈'], ['douyin', '抖音图文']] as const).map(([value, label]) =>
-          <button key={value} aria-pressed={filter === value} onClick={() => setFilter(value)}>
-            {label}（{drafts.filter(d => value === 'all' || d.platform === value).length}）
-          </button>
-        )}
-      </fieldset>
-      <div className="draft-section">
-        <label className="field-label">搜索草稿
-          <input aria-label="搜索草稿" placeholder="标题或文案" value={query} onChange={e => setQuery(e.target.value)}/>
-        </label>
-        {query && <button onClick={() => setQuery('')}>清空搜索</button>}
-        <p>草稿列表（{filtered.length}）</p>
-        <div className="draft-list">
-          {filtered.map(item => <button key={item.id} className="draft-card" aria-pressed={draft?.id === item.id} onClick={() => select(item)} disabled={working}>
-            {item.items[0] && <img className="draft-thumb" src={item.items[0].imageUrl} alt=""/>}
-            <span><strong>{item.title || '未命名草稿'}</strong><br/>
-              {item.platform === 'moments' ? '朋友圈' : '抖音'} · {item.items.length} 张素材<br/>
-              {new Date(item.updatedAt).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })}
-            </span>
-          </button>)}
-          {!filtered.length && <p>{query ? '没有匹配的草稿' : '没有草稿'}</p>}
-        </div>
-      </div>
-      <div className="sidebar-bottom"><p>本地保存</p><button onClick={() => setAbout(true)}>使用与存储</button></div>
-    </aside>
-    <main className="main-workspace">
-      <header className="workspace-header">
-        <span>{draft?.platform === 'douyin' ? '抖音图文' : '朋友圈图文'}</span>
-        <span role="status">{saveStatus}</span>
-      </header>
-      {draft ? <div className="editor-preview-layout">
-        <section className="editor">
-          <h2>编辑草稿</h2>
-          <label className="field-label">草稿标题
-            <input aria-label="草稿标题" value={draft.title} disabled={working} maxLength={120}
-              onChange={e => change({ title: e.target.value })}
-              onBlur={() => { if (!draftRef.current?.title.trim()) change({ title: '未命名草稿' }); }}/>
-          </label>
-          <div className="controls">
-            <button disabled={working} onClick={() => void perform(async () => { await flush(); const next = await window.desktop.duplicateDraft(draft.id); updateList(next); show(next); })}>复制草稿</button>
-            <button disabled={working} onClick={() => setDeleteConfirm(true)}>删除草稿</button>
-          </div>
-          <fieldset className="platform-choice">
-            <legend>发布平台</legend>
-            <div className="controls">
-              <button aria-pressed={draft.platform === 'moments'} disabled={working} onClick={() => change({ platform: 'moments' })}>朋友圈</button>
-              <button aria-pressed={draft.platform === 'douyin'} disabled={working} onClick={() => change({ platform: 'douyin' })}>抖音图文</button>
-            </div>
-          </fieldset>
-          <section>
-            <h2>图片素材（{draft.items.length}）</h2>
-            <div className="controls">
-              <button disabled={working} onClick={() => setVideoOpen(true)}>从视频取材</button>
-              <button disabled={working} onClick={() => importFiles()}>添加图片</button>
-            </div>
-            <div className="asset-dropzone" data-drag-over={dragging}
-              onDragOver={e => { e.preventDefault(); if (e.dataTransfer.types.includes('Files') && !working) setDragging(true); }}
-              onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragging(false); }}
-              onDrop={e => {
-                e.preventDefault(); setDragging(false);
-                if (working || !e.dataTransfer.files.length) return;
-                const paths = window.desktop.pathsForFiles(Array.from(e.dataTransfer.files));
-                if (paths.some(p => /\.(mov|mp4)$/i.test(p))) { setNotice({ text: '视频请通过“从视频取材”打开', error: true }); return; }
-                importFiles(paths);
-              }}>
-              {draft.items.length ? <div className="asset-grid">
-                {draft.items.map((asset, index) => <article className="asset-card" key={asset.id} draggable={!working}
-                  onDragStart={() => dragged.current = index} onDragOver={e => e.preventDefault()}
-                  onDrop={e => { if (dragged.current !== null) { e.stopPropagation(); e.preventDefault(); reorder(dragged.current, index); dragged.current = null; } }}
-                  onDragEnd={() => dragged.current = null}>
-                  <img src={asset.imageUrl} alt={asset.name}/>
-                  <div>第 {index + 1} 张 · {asset.width} × {asset.height} {asset.kind === 'live' && <span className="asset-live">实况</span>}</div>
-                  <div className="controls">
-                    <button aria-label={'前移第 ' + (index + 1) + ' 张'} disabled={working || index === 0} onClick={() => reorder(index, index - 1)}>前移</button>
-                    <button aria-label={'后移第 ' + (index + 1) + ' 张'} disabled={working || index === draft.items.length - 1} onClick={() => reorder(index, index + 1)}>后移</button>
-                    <button aria-label={'编辑第 ' + (index + 1) + ' 张图片'} disabled={working} onClick={() => setCropAsset(asset)}>裁切 / 旋转</button>
-                    <button aria-label={'移除第 ' + (index + 1) + ' 张图片'} disabled={working} onClick={() => change({ items: draft.items.filter(i => i.id !== asset.id) })}>移除</button>
-                  </div>
-                </article>)}
-                <button className="add-more" onClick={() => importFiles()} disabled={working}>继续添加</button>
-              </div> : <button className="empty-dropzone" disabled={working} onClick={() => importFiles()}>点击选择或拖入图片（JPG / PNG / WebP）</button>}
-            </div>
-            <p>可拖动或使用前移、后移按钮调整顺序。裁切与旋转保留原图。</p>
-          </section>
-          <section>
-            <h2>发布文案</h2>
-            <textarea className="caption-input" aria-label="发布文案" placeholder="输入发布文案" rows={7}
-              value={draft.caption} disabled={working} maxLength={100000} onChange={e => change({ caption: e.target.value })}/>
-            <div className="controls">
-              <span>{Array.from(draft.caption).length.toLocaleString()} 字</span>
-              <button disabled={!draft.caption} onClick={() => void perform(async () => { await window.desktop.copyText(draft.caption); setNotice({ text: '文案已复制，可粘贴到发布页面' }); })}>复制文案</button>
-            </div>
-            <p>文案与图片独立保存。</p>
-          </section>
-        </section>
-        <aside className="preview-panel">
-          <h2>图文排版预览</h2>
-          <div className="preview-scroll"><Preview draft={draft}/></div>
-          <div className="export-bar">
-            <p>{draft.items.length} 个素材 · {Array.from(draft.caption).length} 字</p>
-            <button disabled={working || (!draft.items.length && !draft.caption.trim())} onClick={() => { setExportOpen(true); setExportResult(null); }}>导出素材包</button>
-          </div>
-        </aside>
-      </div> : <div className="workspace-empty">
-        {loading ? <p role="status">正在加载草稿…</p> : <><p>没有打开的草稿。</p><button onClick={newDraft}>新建图文</button></>}
-      </div>}
+    <header className="app-header">
+      <strong>片语</strong>
+      <span>{page === 'library' ? '草稿列表' : (draft?.title || '未命名草稿')}</span>
+      <span role="status">{page === 'library' ? '本地保存' : saveStatus}</span>
+      <button onClick={() => setAbout(true)}>使用与存储</button>
+    </header>
+    {page !== 'library' && draft && <nav className="step-nav" aria-label="制作步骤">
+      <button disabled={working} onClick={() => navigate('library')}>草稿列表</button>
+      {([['media', '1 图片素材'], ['caption', '2 发布文案'], ['review', '3 预览导出']] as const).map(([step, label]) =>
+        <button key={step} disabled={working} aria-current={page === step ? 'step' : undefined} onClick={() => navigate(step)}>{label}</button>
+      )}
+    </nav>}
+    <main className="page-body">
+      {loading ? <p role="status">正在加载草稿…</p> : page === 'library' || !draft ?
+        <LibraryPage drafts={drafts} filter={filter} query={query} busy={working} setFilter={setFilter} setQuery={setQuery} create={newDraft} open={select}/> :
+        page === 'media' ? <MediaPage draft={draft} busy={working} change={change} importFiles={importFiles}
+          openVideo={() => setVideoOpen(true)} reorder={reorder} edit={setCropAsset} dragState={dragged}
+          rejectVideoDrop={() => setNotice({ text: '视频请通过“从视频取材”打开', error: true })}
+          duplicate={() => void perform(async () => { await flush(); const next = await window.desktop.duplicateDraft(draft.id); updateList(next); show(next); })}
+          remove={() => setDeleteConfirm(true)}/> :
+        page === 'caption' ? <CaptionPage draft={draft} busy={working} change={change}
+          copy={() => void perform(async () => { await window.desktop.copyText(draft.caption); setNotice({ text: '文案已复制，可粘贴到发布页面' }); })}/> :
+        <ReviewPage draft={draft} busy={working} exportPackage={() => { setExportOpen(true); setExportResult(null); }}/>
+      }
     </main>
+    {page !== 'library' && draft && <nav className="flow-footer" aria-label="步骤操作">
+      {page === 'media' && <><button disabled={working} onClick={() => navigate('library')}>返回草稿列表</button><button disabled={working} onClick={() => navigate('caption')}>下一步：写文案</button></>}
+      {page === 'caption' && <><button disabled={working} onClick={() => navigate('media')}>上一步：图片素材</button><button disabled={working} onClick={() => navigate('review')}>下一步：预览导出</button></>}
+      {page === 'review' && <><button disabled={working} onClick={() => navigate('caption')}>上一步：发布文案</button><button disabled={working} onClick={() => navigate('library')}>返回草稿列表</button></>}
+    </nav>}
     {notice && <div role={notice.error ? 'alert' : 'status'} className="notification">
       <p>{notice.error ? '失败：' : ''}{notice.text}</p>
       {notice.retry && <button disabled={working} onClick={notice.retry}>重试</button>}
@@ -242,7 +159,7 @@ export function App() {
         <button disabled={working} onClick={() => void perform(async () => {
           await flush(); if (!draft) return;
           await window.desktop.deleteDraft(draft.id);
-          const remaining = drafts.filter(d => d.id !== draft.id); setDrafts(remaining); show(remaining[0] || null); setDeleteConfirm(false);
+          const remaining = drafts.filter(d => d.id !== draft.id); setDrafts(remaining); show(null); setPage('library'); setDeleteConfirm(false);
         })}>删除草稿</button>
       </footer>
     </Modal>}
