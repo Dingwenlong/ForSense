@@ -4,17 +4,18 @@ import { useJobs, errorText } from './hooks';
 import { Modal } from './Modal';
 import { CropEditor } from './CropEditor';
 import { VideoTool } from './VideoTool';
-import { LibraryPage, MediaPage, CaptionPage, ReviewPage, type WorkPage } from './pages';
+import { LibraryPage } from './pages';
+import { WorkbenchPage } from './WorkbenchPage';
 
 export function App() {
-  const [drafts, setDrafts] = useState<Draft[]>([]), [draft, setDraft] = useState<Draft | null>(null), [page, setPage] = useState<WorkPage>('library'), [filter, setFilter] = useState<'all' | 'moments' | 'douyin'>('all'), [query, setQuery] = useState('');
+  const [drafts, setDrafts] = useState<Draft[]>([]), [draft, setDraft] = useState<Draft | null>(null), [page, setPage] = useState<'library' | 'workbench'>('library'), [filter, setFilter] = useState<'all' | 'moments' | 'douyin'>('all'), [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false), [loading, setLoading] = useState(true), [saveStatus, setSaveStatus] = useState('已保存');
   const [notice, setNotice] = useState<{ text: string; error?: boolean; retry?: () => void } | null>(null);
   const [cropAsset, setCropAsset] = useState<MediaAsset | null>(null), [videoOpen, setVideoOpen] = useState(false), [videoSource, setVideoSource] = useState<VideoSource | null>(null);
   const [exportOpen, setExportOpen] = useState(false), [exportDirectory, setExportDirectory] = useState(''), [exportFormat, setExportFormat] = useState<'folder' | 'zip'>('folder'), [targets, setTargets] = useState<('apple' | 'android')[]>(['apple', 'android']);
   const [exportResult, setExportResult] = useState<string | null>(null), [about, setAbout] = useState(false), [deleteConfirm, setDeleteConfirm] = useState(false);
   const [info, setInfo] = useState<{ version: string; dataDirectory: string; compatibility: string } | null>(null);
-  const draftRef = useRef<Draft | null>(null), timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined), revision = useRef(0), dirty = useRef(false), saveQueue = useRef<Promise<unknown>>(Promise.resolve()), dragged = useRef<number | null>(null);
+  const draftRef = useRef<Draft | null>(null), timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined), revision = useRef(0), dirty = useRef(false), saveQueue = useRef<Promise<unknown>>(Promise.resolve());
   const { run, job, processing, cancel } = useJobs();
   const working = busy || processing;
 
@@ -55,9 +56,9 @@ export function App() {
     catch (error) { const text = errorText(error); if (!text.includes('取消')) setNotice({ text, error: true, retry: () => void perform(action) }); }
     finally { setBusy(false); }
   }
-  const select = (item: Draft) => { void perform(async () => { await flush(); show(item); setPage('media'); }); };
-  const newDraft = (platform: Draft['platform']) => { void perform(async () => { await flush(); const next = await window.desktop.createDraft(platform); updateList(next); show(next); setQuery(''); setPage('media'); }); };
-  const navigate = (next: WorkPage) => { if (working) return; void perform(async () => { await flush(); setPage(next); }); };
+  const select = (item: Draft) => { void perform(async () => { await flush(); show(item); setPage('workbench'); }); };
+  const newDraft = (platform: Draft['platform']) => { void perform(async () => { await flush(); const next = await window.desktop.createDraft(platform); updateList(next); show(next); setQuery(''); setPage('workbench'); }); };
+  const backToLibrary = () => { if (working) return; void perform(async () => { await flush(); setPage('library'); }); };
   const addItems = (items: MediaAsset[]) => { const current = draftRef.current; if (current) { if (current.items.length + items.length > 200) throw new Error('每份草稿最多整理 200 个素材，请新建草稿继续添加'); change({ items: [...current.items, ...items] }); } };
   const importFiles = (paths?: string[]) => { void perform(async () => { const selected = paths || await window.desktop.pickImages(); if (!selected.length) return; if ((draftRef.current?.items.length || 0) + selected.length > 200) throw new Error('每份草稿最多整理 200 个素材，请分成多份草稿'); const items = await run<MediaAsset[]>('images', selected); addItems(items); setNotice({ text: `已加入 ${items.length} 张图片` }); }); };
   function reorder(from: number, to: number) { if (!draft || from === to || from < 0 || to < 0 || to >= draft.items.length) return; const items = [...draft.items]; const [item] = items.splice(from, 1); items.splice(to, 0, item); change({ items }); }
@@ -69,34 +70,23 @@ export function App() {
   return <div className="app-shell">
     <header className="app-header">
       <strong>片语</strong>
+      {page === 'workbench' && <button disabled={working} onClick={backToLibrary}>返回草稿列表</button>}
       <span>{page === 'library' ? '草稿列表' : (draft?.title || '未命名草稿')}</span>
       <span role="status">{page === 'library' ? '本地保存' : saveStatus}</span>
       <button onClick={() => setAbout(true)}>使用与存储</button>
     </header>
-    {page !== 'library' && draft && <nav className="step-nav" aria-label="制作步骤">
-      <button disabled={working} onClick={() => navigate('library')}>草稿列表</button>
-      {([['media', '1 图片素材'], ['caption', '2 发布文案'], ['review', '3 预览导出']] as const).map(([step, label]) =>
-        <button key={step} disabled={working} aria-current={page === step ? 'step' : undefined} onClick={() => navigate(step)}>{label}</button>
-      )}
-    </nav>}
     <main className="page-body">
       {loading ? <p role="status">正在加载草稿…</p> : page === 'library' || !draft ?
         <LibraryPage drafts={drafts} filter={filter} query={query} busy={working} setFilter={setFilter} setQuery={setQuery} create={newDraft} open={select}/> :
-        page === 'media' ? <MediaPage draft={draft} busy={working} change={change} importFiles={importFiles}
-          openVideo={() => setVideoOpen(true)} reorder={reorder} edit={setCropAsset} dragState={dragged}
+        <WorkbenchPage draft={draft} busy={working} change={change} importFiles={importFiles}
+          openVideo={() => setVideoOpen(true)} reorder={reorder} edit={setCropAsset}
           rejectVideoDrop={() => setNotice({ text: '视频请通过“从视频取材”打开', error: true })}
           duplicate={() => void perform(async () => { await flush(); const next = await window.desktop.duplicateDraft(draft.id); updateList(next); show(next); })}
-          remove={() => setDeleteConfirm(true)}/> :
-        page === 'caption' ? <CaptionPage draft={draft} busy={working} change={change}
-          copy={() => void perform(async () => { await window.desktop.copyText(draft.caption); setNotice({ text: '文案已复制，可粘贴到发布页面' }); })}/> :
-        <ReviewPage draft={draft} busy={working} exportPackage={() => { setExportOpen(true); setExportResult(null); }}/>
+          remove={() => setDeleteConfirm(true)}
+          copy={() => void perform(async () => { await window.desktop.copyText(draft.caption); setNotice({ text: '文案已复制，可粘贴到发布页面' }); })}
+          exportPackage={() => { setExportOpen(true); setExportResult(null); }}/>
       }
     </main>
-    {page !== 'library' && draft && <nav className="flow-footer" aria-label="步骤操作">
-      {page === 'media' && <><button disabled={working} onClick={() => navigate('library')}>返回草稿列表</button><button disabled={working} onClick={() => navigate('caption')}>下一步：写文案</button></>}
-      {page === 'caption' && <><button disabled={working} onClick={() => navigate('media')}>上一步：图片素材</button><button disabled={working} onClick={() => navigate('review')}>下一步：预览导出</button></>}
-      {page === 'review' && <><button disabled={working} onClick={() => navigate('caption')}>上一步：发布文案</button><button disabled={working} onClick={() => navigate('library')}>返回草稿列表</button></>}
-    </nav>}
     {notice && <div role={notice.error ? 'alert' : 'status'} className="notification">
       <p>{notice.error ? '失败：' : ''}{notice.text}</p>
       {notice.retry && <button disabled={working} onClick={notice.retry}>重试</button>}

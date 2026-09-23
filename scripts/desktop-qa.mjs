@@ -28,11 +28,7 @@ async function selectFiles(paths) {
   await application.evaluate(({ dialog }, files) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: files }); }, paths);
 }
 const cards = () => page.locator('.asset-card');
-async function go(label) {
-  await page.getByRole('navigation', { name: '制作步骤' }).getByRole('button', { name: label, exact: true }).click();
-  const heading = label === '草稿列表' ? '我的草稿' : label === '1 图片素材' ? '图片素材' : label === '2 发布文案' ? '发布文案' : '预览与导出';
-  await page.getByRole('heading', { name: heading, exact: true }).waitFor();
-}
+const tab = name => page.getByRole('tab', { name, exact: false });
 
 try {
   const images = [];
@@ -46,67 +42,49 @@ try {
 
   await launch();
   assert.equal(await page.locator('.library-card').count(), 0);
-  assert.equal(await page.getByRole('textbox', { name: '发布文案', exact: true }).count(), 0);
-  assert.equal(await page.getByRole('button', { name: '导出素材包', exact: true }).count(), 0);
+  assert.equal(await page.locator('.workbench-page').count(), 0);
   await page.screenshot({ path: path.join(output, '01-library.png') });
-  record('Packaged app starts in an empty draft library, with editing and export hidden');
+  record('Packaged app starts at the draft library without an editor');
 
   await page.getByRole('button', { name: '新建朋友圈图文', exact: true }).click();
-  await page.getByRole('heading', { name: '图片素材', exact: true }).waitFor();
-  assert.equal(await page.getByRole('heading', { name: '图文排版预览', exact: true }).count(), 0);
+  await page.getByRole('heading', { name: '实时预览', exact: true }).waitFor();
+  assert.equal(await page.locator('.wechat-proof').count(), 1);
+  assert.equal(await tab('文案').getAttribute('aria-selected'), 'true');
+  assert.equal(await page.locator('.step-nav, .flow-footer').count(), 0);
+  record('Creating a draft opens the preview workbench with focused editing tabs');
+
   const title = page.getByRole('textbox', { name: '草稿标题', exact: true });
   await title.fill('海边的慢日子');
-  await selectFiles(images);
-  await page.getByRole('button', { name: '添加图片', exact: true }).click();
-  await waitFor(async () => await cards().count() === 3);
-  const first = await cards().first().locator('img').getAttribute('src');
-  await page.getByRole('button', { name: '后移第 1 张', exact: true }).click();
-  assert.notEqual(await cards().first().locator('img').getAttribute('src'), first);
-  await page.getByRole('button', { name: '编辑第 1 张图片', exact: true }).click();
-  await page.getByRole('button', { name: '1:1', exact: true }).click();
-  await page.screenshot({ path: path.join(output, '02-crop.png') });
-  await page.getByRole('button', { name: '应用调整', exact: true }).click();
-  await page.getByRole('dialog', { name: '调整画面' }).waitFor({ state: 'hidden' });
-  assert.match(await cards().first().innerText(), /900 × 900/);
-  await page.screenshot({ path: path.join(output, '03-media.png') });
-  record('Media page imports, reorders and crops without showing unrelated panels');
-
-  await page.getByRole('button', { name: '下一步：写文案', exact: true }).click();
-  await page.getByRole('heading', { name: '发布文案', exact: true }).waitFor();
-  assert.equal(await page.getByRole('button', { name: '添加图片', exact: true }).count(), 0);
-  assert.equal(await page.getByRole('button', { name: '导出素材包', exact: true }).count(), 0);
   const caption = '把时间留给风，把心情留给海。\n\n走走停停，收集一些简单的快乐。🌊\n#周末日常 #慢生活';
   await page.getByRole('textbox', { name: '发布文案', exact: true }).fill(caption);
+  await waitFor(async () => await page.locator('.wechat-proof__caption').innerText() === caption);
   await page.getByRole('button', { name: '复制文案', exact: true }).click();
   await page.getByText('文案已复制，可粘贴到发布页面', { exact: true }).waitFor();
   assert.equal(await application.evaluate(({ clipboard }) => clipboard.readText()), caption);
-  await page.screenshot({ path: path.join(output, '04-caption.png') });
-  record('Caption page edits and copies Unicode text while media and export controls stay hidden');
+  await page.screenshot({ path: path.join(output, '02-live-caption.png') });
+  record('Caption edits and clipboard copying update the WeChat proof without navigation');
 
-  await page.getByRole('button', { name: '上一步：图片素材', exact: true }).click();
-  await page.getByRole('heading', { name: '图片素材', exact: true }).waitFor();
-  assert.equal(await cards().count(), 3);
-  await go('2 发布文案');
-  assert.equal(await page.getByRole('textbox', { name: '发布文案', exact: true }).inputValue(), caption);
-  await page.getByRole('button', { name: '下一步：预览导出', exact: true }).click();
-  await page.getByRole('heading', { name: '预览与导出', exact: true }).waitFor();
-  assert.equal(await page.locator('.preview-image').count(), 3);
-  assert.equal(await page.locator('.layout-caption').innerText(), caption);
-  assert.equal(await page.getByRole('textbox', { name: '发布文案', exact: true }).count(), 0);
-  assert.equal(await page.locator('.wechat-proof__grid .wechat-proof__photo').count(), 3);
-  assert.equal(await page.locator('.wechat-proof__setting').count(), 3);
-  assert.equal(await page.getByRole('button', { name: '发表', exact: true }).count(), 0);
-  await page.screenshot({ path: path.join(output, '05-wechat-review.png') });
-  await page.locator('.wechat-proof').screenshot({ path: path.join(output, '05-wechat-card.png') });
-  record('Back, forward and direct step navigation save the draft and show only review content');
+  await tab('图片').click();
+  await selectFiles(images);
+  await page.getByRole('button', { name: '添加图片', exact: true }).click();
+  await waitFor(async () => await cards().count() === 3);
+  assert.equal(await page.locator('.wechat-proof__photo').count(), 3);
+  const first = await page.locator('.wechat-proof__photo img').first().getAttribute('src');
+  await page.getByRole('button', { name: '后移第 1 张', exact: true }).click();
+  assert.notEqual(await page.locator('.wechat-proof__photo img').first().getAttribute('src'), first);
+  await page.getByRole('button', { name: '编辑第 1 张图片', exact: true }).click();
+  await page.getByRole('button', { name: '1:1', exact: true }).click();
+  await page.screenshot({ path: path.join(output, '03-crop.png') });
+  await page.getByRole('button', { name: '应用调整', exact: true }).click();
+  await page.getByRole('dialog', { name: '调整画面' }).waitFor({ state: 'hidden' });
+  assert.match(await cards().first().innerText(), /900 × 900/);
+  await page.screenshot({ path: path.join(output, '04-live-media.png') });
+  record('Image import, reordering and crop appear immediately in the adjacent preview');
 
-  await go('1 图片素材');
   await page.locator('.platform-choice').getByRole('button', { name: '抖音图文', exact: true }).click();
-  await go('3 预览导出');
+  assert.equal(await page.locator('.douyin-proof').count(), 1);
   await page.getByRole('button', { name: '下一张', exact: true }).click();
   assert.equal(await page.locator('.image-counter').innerText(), '2/3');
-  assert.equal(await page.locator('.douyin-proof__header').count(), 1);
-  assert.equal(await page.locator('.douyin-proof__segments span').count(), 3);
   assert.equal(await page.locator('.douyin-proof__hashtag').count(), 2);
   await page.locator('.douyin-proof__media').focus();
   await page.keyboard.press('ArrowRight');
@@ -115,44 +93,50 @@ try {
   assert.equal(await page.locator('.image-counter').innerText(), '3/3');
   await page.keyboard.press('ArrowLeft');
   assert.equal(await page.locator('.image-counter').innerText(), '2/3');
-  assert.equal(await page.locator('.layout-caption').innerText(), caption);
   await page.locator('.douyin-proof__media').evaluate(element => element.blur());
-  await page.screenshot({ path: path.join(output, '05-review.png') });
-  await page.locator('.douyin-proof__footer').scrollIntoViewIfNeeded();
-  await page.screenshot({ path: path.join(output, '05-douyin-lower.png') });
-  await page.locator('.page-body').evaluate(element => { element.scrollTop = 0; });
-  record('Douyin review uses the reference hierarchy, highlights caption tags and supports bounded image navigation');
+  await page.screenshot({ path: path.join(output, '05-douyin-preview.png') });
+  record('Platform switch preserves draft and the Douyin carousel and caption remain functional');
+
+  await tab('文案').click();
+  assert.equal(await page.getByRole('textbox', { name: '发布文案', exact: true }).inputValue(), caption);
+  await page.locator('.platform-choice').getByRole('button', { name: '朋友圈', exact: true }).click();
+  assert.equal(await page.locator('.wechat-proof__photo').count(), 3);
+  assert.equal(await page.locator('.wechat-proof__setting').count(), 3);
+  assert.equal(await page.getByRole('button', { name: '发表', exact: true }).count(), 0);
+  await page.screenshot({ path: path.join(output, '06-wechat-preview.png') });
+  record('Inspector tabs and both platform previews can be switched without changing page');
 
   await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1080, 720));
   await waitFor(async () => await page.evaluate(() => window.innerWidth <= 1080));
   const viewport = await page.evaluate(() => {
-    const button = document.querySelector('.review-actions button');
-    const box = button.getBoundingClientRect();
-    const target = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
-    return { fits: document.documentElement.scrollWidth <= window.innerWidth, exportVisible: box.left >= 0 && box.right <= window.innerWidth && box.bottom <= window.innerHeight, exportUnobstructed: button.contains(target) };
+    const button = document.querySelector('.workbench-preview-head button');
+    const rect = button.getBoundingClientRect(), target = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    return { fits: document.documentElement.scrollWidth <= window.innerWidth, exportVisible: rect.left >= 0 && rect.right <= window.innerWidth && rect.bottom <= window.innerHeight, exportUnobstructed: button.contains(target) };
   });
   assert.deepEqual(viewport, { fits: true, exportVisible: true, exportUnobstructed: true });
-  await page.screenshot({ path: path.join(output, '06-minimum-window.png') });
+  await page.screenshot({ path: path.join(output, '07-minimum-window.png') });
   await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1440, 930));
-  record('Minimum window keeps review and export accessible without horizontal overflow');
+  record('Minimum window keeps editor, preview and export accessible');
 
-  await go('1 图片素材');
+  await page.locator('.draft-operations summary').click();
   await page.getByRole('button', { name: '复制草稿', exact: true }).click();
   await waitFor(async () => (await title.inputValue()).endsWith('副本'));
-  await go('草稿列表');
+  await page.getByRole('button', { name: '返回草稿列表', exact: true }).click();
   await page.getByRole('heading', { name: '我的草稿', exact: true }).waitFor();
   assert.equal(await page.locator('.library-card').count(), 2);
   await page.getByRole('textbox', { name: '搜索草稿', exact: true }).fill('没有这个标题');
   assert.equal(await page.locator('.library-card').count(), 0);
   await page.getByRole('button', { name: '清空搜索', exact: true }).click();
   await page.locator('.library-card').filter({ hasText: '副本' }).click();
+  await page.locator('.draft-operations summary').click();
   await page.getByRole('button', { name: '删除草稿', exact: true }).click();
   await page.getByRole('dialog', { name: '删除这份草稿？' }).getByRole('button', { name: '删除草稿', exact: true }).click();
   await page.getByRole('heading', { name: '我的草稿', exact: true }).waitFor();
   assert.equal(await page.locator('.library-card').count(), 1);
   await page.locator('.library-card').filter({ hasText: '海边的慢日子' }).click();
-  record('Library search, duplicate, deletion and reopening preserve the original draft');
+  record('Library search, duplicate, deletion and return preserve the original draft');
 
+  await tab('图片').click();
   await page.getByRole('button', { name: '从视频取材', exact: true }).click();
   await selectFiles([inputVideo]);
   await page.locator('.video-source-label').getByRole('button', { name: '选择视频', exact: true }).click();
@@ -165,14 +149,14 @@ try {
   const clipEnd = Number(await page.getByRole('spinbutton', { name: '实况结束时间', exact: true }).inputValue());
   assert.ok(clipEnd <= 1.21);
   await page.getByRole('checkbox', { name: '保留原声', exact: true }).uncheck();
-  await page.screenshot({ path: path.join(output, '07-video-studio.png') });
+  await page.screenshot({ path: path.join(output, '08-video-studio.png') });
   await page.getByRole('button', { name: '制作并加入草稿', exact: true }).click();
   await waitFor(async () => await cards().count() === 5);
   await page.getByRole('button', { name: '返回图文', exact: true }).click();
   assert.equal(await page.locator('.asset-live').count(), 1);
-  record('Video frame and short muted Live Photo remain usable from the media page');
+  assert.equal(await page.locator('.wechat-proof__photo').count(), 5);
+  record('Video frame and Live Photo generated from the editor update the visible preview');
 
-  await go('3 预览导出');
   await page.getByRole('button', { name: '导出素材包', exact: true }).click();
   const exportParent = path.join(work, 'exports'); await mkdir(exportParent);
   await selectFiles([exportParent]);
@@ -184,8 +168,8 @@ try {
   const manifest = JSON.parse(await readFile(path.join(folder, '素材清单.json'), 'utf8'));
   assert.equal(manifest.items.length, 5); assert.equal(manifest.items[4].files.length, 3);
   assert.equal(manifest.deviceVerification, 'pending');
-  await page.screenshot({ path: path.join(output, '08-export.png') });
-  record('Review page exports ordered media, both Live Photo formats and an independent caption');
+  await page.screenshot({ path: path.join(output, '09-export.png') });
+  record('Preview workbench exports ordered images, both Live Photo formats and caption');
 
   await page.getByRole('button', { name: '关闭窗口', exact: true }).click();
   await page.getByRole('button', { name: '导出素材包', exact: true }).click();
@@ -194,29 +178,25 @@ try {
   await page.getByRole('heading', { name: '素材包已保存', exact: true }).waitFor();
   const zip = await page.locator('.export-success .destination-path').innerText();
   assert.equal((await readFile(zip)).subarray(0, 2).toString(), 'PK');
-  record('ZIP export remains available from the final step');
-
   await page.getByRole('button', { name: '关闭窗口', exact: true }).click();
-  await go('2 发布文案');
+  record('ZIP export remains available directly from preview');
+
+  await tab('文案').click();
   await page.getByRole('textbox', { name: '发布文案', exact: true }).fill(caption + '\n刚刚补上的一句。');
   await application.close(); application = null;
   await launch();
   await page.locator('.library-card').filter({ hasText: '海边的慢日子' }).click();
+  await page.getByRole('heading', { name: '实时预览', exact: true }).waitFor();
+  await tab('图片').click();
   assert.equal(await cards().count(), 5);
-  await go('2 发布文案');
+  await tab('文案').click();
   assert.equal(await page.getByRole('textbox', { name: '发布文案', exact: true }).inputValue(), caption + '\n刚刚补上的一句。');
-  record('Exit flushes edits and restart begins at the library with draft contents restored');
+  record('Exit flushes edits; restart restores the draft in the live workbench');
 
-  await go('草稿列表');
+  await page.getByRole('button', { name: '返回草稿列表', exact: true }).click();
   await page.getByRole('button', { name: '新建抖音图文', exact: true }).click();
-  await page.getByRole('heading', { name: '图片素材', exact: true }).waitFor();
-  assert.equal(await cards().count(), 0);
-  await page.getByRole('button', { name: '下一步：写文案', exact: true }).click();
   await page.getByRole('textbox', { name: '发布文案', exact: true }).fill('只有文字也能保存。');
-  await page.getByRole('button', { name: '下一步：预览导出', exact: true }).click();
-  await page.getByRole('heading', { name: '预览与导出', exact: true }).waitFor();
-  assert.equal(await page.locator('.douyin-proof').count(), 1);
-  assert.equal(await page.getByRole('button', { name: '导出素材包', exact: true }).isEnabled(), true);
+  assert.equal(await page.locator('.douyin-proof__caption').innerText(), '只有文字也能保存。');
   await page.getByRole('button', { name: '导出素材包', exact: true }).click();
   await selectFiles([exportParent]);
   await page.getByRole('button', { name: '选择位置', exact: true }).click();
@@ -225,7 +205,7 @@ try {
   const textOnlyFolder = await page.locator('.export-success .destination-path').innerText();
   assert.equal(await readFile(path.join(textOnlyFolder, '文案.txt'), 'utf8'), '只有文字也能保存。');
   assert.equal(JSON.parse(await readFile(path.join(textOnlyFolder, '素材清单.json'), 'utf8')).items.length, 0);
-  record('A new text-only draft can skip media and export from the final page');
+  record('Text-only draft can be previewed and exported without changing pages');
 
   const boundary = await page.evaluate(async () => {
     try { await window.desktop.startJob(crypto.randomUUID(), 'export', { directory: 'C:/', draftId: crypto.randomUUID(), format: 'folder', targets: [] }); return false; }

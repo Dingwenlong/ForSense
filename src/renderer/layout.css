@@ -4,7 +4,7 @@
 body { margin: 0; }
 button, input, textarea, select { font: inherit; }
 button { padding: 3px 8px; }
-button[aria-pressed="true"], button[aria-current="step"] { outline: 2px solid currentColor; outline-offset: -3px; font-weight: bold; }
+button[aria-pressed="true"], button[aria-selected="true"] { outline: 2px solid currentColor; outline-offset: -3px; font-weight: bold; }
 button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid Highlight; outline-offset: 2px; }
 fieldset { min-width: 0; margin: 12px 0; }
 legend { padding: 0 4px; }
@@ -19,20 +19,15 @@ img, video { max-width: 100%; }
 .caption-input { display: block; width: 100%; min-height: min(55vh, 480px); resize: vertical; }
 .destination-path, .layout-caption { overflow-wrap: anywhere; }
 
-/* One task at a time: library, media, caption, or review. */
+/* Library and live preview workbench. */
 .app-shell { display: flex; flex-direction: column; height: 100vh; min-height: 0; }
 .app-header { display: flex; align-items: center; gap: 16px; padding: 10px 18px; border-bottom: 1px solid GrayText; }
-.app-header > span:nth-child(2) { min-width: 0; flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.app-header > span:not([role="status"]) { min-width: 0; flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .app-header > span[role="status"] { white-space: nowrap; }
-.step-nav, .flow-footer { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 18px; }
-.step-nav { border-bottom: 1px solid GrayText; }
-.flow-footer { border-top: 1px solid GrayText; justify-content: space-between; }
 .page-body { flex: 1; min-height: 0; overflow: auto; }
 .page-content { width: min(100%, 1160px); margin: 0 auto; padding: 16px 22px 24px; }
 .page-content > h1 { margin-top: 4px; }
 .library-page { max-width: 960px; }
-.media-page { max-width: 1050px; }
-.caption-page { max-width: 860px; }
 .library-page fieldset label { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; }
 .library-page fieldset input { min-width: 0; width: 260px; }
 .library-filters { margin-top: 12px; }
@@ -41,21 +36,30 @@ img, video { max-width: 100%; }
 .library-card > span:nth-child(2) { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .library-card > img { width: 45px; height: 55px; object-fit: cover; flex-shrink: 0; }
 
-/* Media layout keeps images visible while remaining draggable. */
-.asset-dropzone { padding: 8px 0; }
-.asset-dropzone[data-drag-over="true"] { outline: 2px dashed currentColor; }
-.asset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(205px, 1fr)); gap: 12px; max-height: 450px; overflow: auto; }
-.asset-card { min-width: 0; }
-.asset-card > img { width: 100%; height: 145px; object-fit: contain; display: block; }
-.asset-card > .controls { margin-top: 4px; }
+/* Editing tools stay beside the existing preview and share the same draft state. */
+.workbench-page { display: grid; grid-template-columns: 350px minmax(0, 1fr); height: 100%; min-height: 0; }
+.workbench-editor { display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 12px; border-right: 1px solid GrayText; }
+.workbench-editor-head { flex-shrink: 0; }
+.workbench-editor-head h2 { margin-top: 0; }
+.editor-tabs { margin: 12px 0; }
+.workbench-editor-scroll { flex: 1; min-height: 0; overflow: auto; }
+.workbench-editor-scroll > section { min-height: 100%; }
+.workbench-editor-scroll .caption-input { min-height: 250px; }
+.draft-operations { flex-shrink: 0; border-top: 1px solid GrayText; padding-top: 10px; }
+.draft-operations .controls { margin-top: 8px; }
+.workbench-preview { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.workbench-preview-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 10px 14px; border-bottom: 1px solid GrayText; }
+.workbench-preview-head h1 { margin: 0 0 3px; }
+.workbench-preview-scroll { flex: 1; min-height: 0; overflow: auto; padding: 14px; }
+.asset-list { display: grid; gap: 8px; margin-top: 12px; }
+.asset-card { display: grid; grid-template-columns: 78px minmax(0, 1fr); gap: 8px; min-width: 0; border-bottom: 1px solid GrayText; padding-bottom: 8px; }
+.asset-card > img { width: 78px; height: 86px; object-fit: cover; display: block; }
+.asset-details { min-width: 0; }
+.asset-details .controls { margin-top: 6px; }
 .asset-live { font-weight: bold; }
-.add-more { grid-column: 1 / -1; }
-.empty-dropzone { width: 100%; min-height: 120px; }
+.empty-dropzone { width: 100%; min-height: 95px; margin-top: 12px; }
 
-/* Review layout; the Douyin reference treatment is scoped below. */
-.review-layout { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 18px; }
-.preview-panel { min-width: 0; }
-.review-actions { min-width: 0; }
+/* The platform preview cards below keep their previous appearance. */
 .layout-caption { white-space: pre-wrap; }
 .preview-image { min-width: 0; position: relative; padding: 2px; }
 
@@ -159,6 +163,8 @@ img, video { max-width: 100%; }
 
 @media (max-width: 850px) {
   .app-header { flex-wrap: wrap; }
-  .review-layout, .video-workspace { display: block; }
-  .review-actions { border-top: 1px solid GrayText; margin-top: 12px; }
+  .workbench-page, .video-workspace { display: block; height: auto; }
+  .workbench-editor { border-right: 0; border-bottom: 1px solid GrayText; }
+  .workbench-editor-scroll { max-height: 420px; }
+  .workbench-preview-scroll { max-height: 800px; }
 }
