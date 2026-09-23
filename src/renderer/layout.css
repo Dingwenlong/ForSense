@@ -53,9 +53,9 @@ img, video { max-width: 100%; }
 .workbench-preview-scroll { flex: 1; min-height: 0; overflow: auto; padding: 14px; }
 .asset-list { display: grid; gap: 8px; margin-top: 12px; }
 .asset-card { display: grid; grid-template-columns: 78px minmax(0, 1fr); gap: 8px; min-width: 0; border-bottom: 1px solid GrayText; padding-bottom: 8px; }
+.asset-card:focus-visible { outline: 2px solid Highlight; outline-offset: -2px; }
 .asset-card > img { width: 78px; height: 86px; object-fit: cover; display: block; }
 .asset-details { min-width: 0; }
-.asset-details .controls { margin-top: 6px; }
 .asset-live { font-weight: bold; }
 .empty-dropzone { width: 100%; min-height: 95px; margin-top: 12px; }
 

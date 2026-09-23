@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Edits, MediaAsset, Crop } from '../shared/types';
 import { Modal } from './Modal';
-export function CropEditor({ asset, busy, save, close }: { asset: MediaAsset; busy: boolean; save: (edits: Edits) => void; close: () => void }) {
+export function CropEditor({ asset, busy, save, remove, close }: { asset: MediaAsset; busy: boolean; save: (edits: Edits) => void; remove: () => void; close: () => void }) {
   const [edits, setEdits] = useState<Edits>(asset.edits), [dimensions, setDimensions] = useState({ width: asset.width, height: asset.height });
   const canvas = useRef<HTMLCanvasElement>(null), container = useRef<HTMLDivElement>(null), drag = useRef<{ x: number; y: number; crop: Crop } | null>(null);
   const crop = edits.crop || { x: 0, y: 0, width: 1, height: 1 };
@@ -32,6 +32,6 @@ export function CropEditor({ asset, busy, save, close }: { asset: MediaAsset; bu
       <span className="field-label">裁切比例</span><div className="ratio-options">{[['完整', null], ['1:1', 1], ['3:4', 0.75], ['4:3', 4 / 3], ['9:16', 9 / 16]].map(([label, r]) => <button key={label} disabled={busy} onClick={() => ratio(r as number | null)}>{label}</button>)}</div>
       <div className="crop-sliders">{(['width', 'height'] as const).map((key, i) => <label key={key}>{i ? '高度' : '宽度'}<input aria-label={`裁切${i ? '高度' : '宽度'}`} disabled={busy} type="range" min="0.1" max="1" step="0.01" value={crop[key]} onChange={e => { const next = { ...crop, [key]: Number(e.target.value) }; next.x = Math.min(next.x, 1 - next.width); next.y = Math.min(next.y, 1 - next.height); setCrop(next); }}/><span>{Math.round(crop[key] * 100)}%</span></label>)}</div>
       <p>拖动画面中的选区调整位置，原始素材会保留。实况的封面与动态画面同步裁切。</p>
-    </div><footer className="modal-footer"><button disabled={busy} onClick={close}>取消</button><button disabled={busy} onClick={() => save(edits)}>{busy ? '正在处理…' : '应用调整'}</button></footer>
+    </div><footer className="modal-footer"><button disabled={busy} onClick={remove}>移除图片</button><button disabled={busy} onClick={close}>取消</button><button disabled={busy} onClick={() => save(edits)}>{busy ? '正在处理…' : '应用调整'}</button></footer>
   </Modal>;
 }

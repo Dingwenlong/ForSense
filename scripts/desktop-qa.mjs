@@ -81,8 +81,14 @@ try {
   await page.getByRole('button', { name: '应用调整', exact: true }).click();
   await page.getByRole('dialog', { name: '调整画面' }).waitFor({ state: 'hidden' });
   assert.match(await cards().first().innerText(), /900 × 900/);
+  assert.equal(await page.locator('.asset-card button').count(), 0);
+  const keyboardItem = await cards().first().locator('img').getAttribute('src');
+  await cards().first().focus();
+  await page.keyboard.press('Alt+ArrowDown');
+  assert.equal(await cards().nth(1).locator('img').getAttribute('src'), keyboardItem);
+  assert.equal(await page.locator('.wechat-proof__photo img').nth(1).getAttribute('src'), keyboardItem);
   await page.screenshot({ path: path.join(output, '04-live-media.png') });
-  record('Holding and dropping a WeChat preview image reorders the draft; one click opens image editing');
+  record('Preview drag reorders images, one click opens editing, and the button-free list retains keyboard ordering');
 
   await page.locator('.platform-choice').getByRole('button', { name: '抖音图文', exact: true }).click();
   assert.equal(await page.locator('.douyin-proof').count(), 1);
@@ -136,6 +142,12 @@ try {
   await page.locator('.draft-operations summary').click();
   await page.getByRole('button', { name: '复制草稿', exact: true }).click();
   await waitFor(async () => (await title.inputValue()).endsWith('副本'));
+  await tab('图片').click();
+  await page.locator('.wechat-proof__photo').first().click();
+  await page.getByRole('dialog', { name: '调整画面' }).getByRole('button', { name: '移除图片', exact: true }).click();
+  await waitFor(async () => await cards().count() === 2);
+  assert.equal(await page.locator('.wechat-proof__photo').count(), 2);
+  record('Removing an image from its edit dialog updates the copied draft and preview');
   await page.getByRole('button', { name: '返回草稿列表', exact: true }).click();
   await page.getByRole('heading', { name: '我的草稿', exact: true }).waitFor();
   assert.equal(await page.locator('.library-card').count(), 2);

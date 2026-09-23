@@ -53,23 +53,19 @@ export function WorkbenchPage({ draft, busy, change, importFiles, openVideo, reo
           <div className="controls"><button disabled={busy} onClick={() => importFiles()}>添加图片</button>
             <button disabled={busy} onClick={openVideo}>从视频取材</button></div>
           {draft.items.length ? <div className="asset-list">
-            {draft.items.map((asset, index) => <article className="asset-card" key={asset.id} draggable={!busy}
+            {draft.items.map((asset, index) => <article className="asset-card" key={asset.id} draggable={!busy} tabIndex={0}
+              aria-label={`第 ${index + 1} 张图片：${asset.name}，Alt 加上下方向键可排序`}
+              onKeyDown={event => { if (busy || !event.altKey) return; const to = event.key === 'ArrowUp' ? index - 1 : event.key === 'ArrowDown' ? index + 1 : index; if (to !== index && to >= 0 && to < draft.items.length) { event.preventDefault(); reorder(index, to); } }}
               onDragStart={() => { dragged.current = index; }} onDragOver={event => event.preventDefault()}
               onDrop={event => { if (dragged.current !== null) { event.stopPropagation(); event.preventDefault(); reorder(dragged.current, index); dragged.current = null; } }}
               onDragEnd={() => { dragged.current = null; }}>
               <img src={asset.imageUrl} alt={asset.name}/>
               <div className="asset-details"><strong>第 {index + 1} 张</strong> · {asset.width} × {asset.height}
                 {asset.kind === 'live' && <span className="asset-live"> · 实况</span>}
-                <div className="controls">
-                  <button aria-label={`前移第 ${index + 1} 张`} disabled={busy || index === 0} onClick={() => reorder(index, index - 1)}>前移</button>
-                  <button aria-label={`后移第 ${index + 1} 张`} disabled={busy || index === draft.items.length - 1} onClick={() => reorder(index, index + 1)}>后移</button>
-                  <button aria-label={`编辑第 ${index + 1} 张图片`} disabled={busy} onClick={() => edit(asset)}>裁切 / 旋转</button>
-                  <button aria-label={`移除第 ${index + 1} 张图片`} disabled={busy} onClick={() => change({ items: draft.items.filter(item => item.id !== asset.id) })}>移除</button>
-                </div>
               </div>
             </article>)}
           </div> : <button className="empty-dropzone" disabled={busy} onClick={() => importFiles()}>点击选择或拖入图片（JPG / PNG / WebP）</button>}
-          <p>可拖动或使用按钮调整顺序。</p>
+          <p>在右侧预览拖动图片排序，单击图片编辑；键盘可在左侧素材上按 Alt + ↑ / ↓ 排序。</p>
         </section>}
       </div>
       <details className="draft-operations"><summary>草稿操作</summary><div className="controls">

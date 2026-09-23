@@ -97,7 +97,10 @@ export function App() {
       <progress aria-label="任务进度" max="100" value={job.progress}/>
       <p>{job.message}</p><button onClick={() => void cancel()}>取消任务</button>
     </div>}
-    {cropAsset && <CropEditor asset={cropAsset} busy={working} close={() => setCropAsset(null)} save={edits => void perform(async () => {
+    {cropAsset && <CropEditor asset={cropAsset} busy={working} close={() => setCropAsset(null)} remove={() => {
+      const current = draftRef.current; if (current) change({ items: current.items.filter(item => item.id !== cropAsset.id) });
+      setCropAsset(null);
+    }} save={edits => void perform(async () => {
       const item = await run<MediaAsset>('edit', { id: cropAsset.id, edits });
       const current = draftRef.current; if (current) change({ items: current.items.map(i => i.id === cropAsset.id ? item : i) });
       setCropAsset(null);
