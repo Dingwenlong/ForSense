@@ -52,22 +52,69 @@ img, video { max-width: 100%; }
 .add-more { grid-column: 1 / -1; }
 .empty-dropzone { width: 100%; min-height: 120px; }
 
-/* The review is a plain content proof plus a single export action. */
+/* Review layout; the Douyin reference treatment is scoped below. */
 .review-layout { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 18px; }
 .preview-panel { min-width: 0; }
 .review-actions { min-width: 0; }
 .layout-caption { white-space: pre-wrap; }
-.layout-images-block { margin: 16px 0; }
-.layout-block-label { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
-.layout-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
-.layout-grid.count-1 { grid-template-columns: 1fr; }
-.layout-grid.count-2, .layout-grid.count-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .preview-image { min-width: 0; position: relative; padding: 2px; }
-.preview-image img { width: 100%; height: 150px; object-fit: contain; display: block; }
-.layout-grid.count-1 img { height: auto; max-height: 350px; }
-.layout-large-image { display: block; width: 100%; padding: 2px; }
-.layout-large-image img, .layout-image-stage > video { display: block; width: 100%; max-height: 460px; object-fit: contain; }
-.layout-carousel { display: flex; align-items: center; justify-content: space-between; gap: 4px; margin: 8px 0; }
+
+/* WeChat Moments composition proof from the supplied reference, without a device frame. */
+.wechat-proof { width: min(100%, 520px); margin: 0 auto; background: #fff; color: #1f2328; border: 1px solid #dedfe2; }
+.wechat-proof__header { display: flex; justify-content: space-between; align-items: center; min-height: 64px; padding: 10px 18px; font-size: 17px; }
+.wechat-proof__publish { background: #08b465; color: #fff; padding: 7px 15px; border-radius: 6px; font-weight: 600; }
+.wechat-proof__caption { min-height: 152px; margin: 0; padding: 28px 22px 16px; font-size: 17px; line-height: 1.6; }
+.wechat-proof__placeholder { color: #a5a7aa; }
+.wechat-proof__photos { padding: 0 18px 28px; }
+.wechat-proof__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+.wechat-proof__photo { display: block; width: 100%; aspect-ratio: 1; padding: 0; border: 0; background: #eef0f2; overflow: hidden; }
+.wechat-proof__photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.wechat-proof__live { position: absolute; right: 4px; bottom: 4px; padding: 2px 4px; color: #fff; background: rgb(0 0 0 / 70%); font-size: 10px; }
+.wechat-proof__empty { margin: 0; padding: 35px 0; color: #777b80; }
+.wechat-proof__overflow { font-size: 11px; color: #686c72; }
+.wechat-proof__settings { margin: 0 18px; border-top: 1px solid #e5e6e7; }
+.wechat-proof__setting { display: grid; grid-template-columns: 25px minmax(0, 1fr) auto 12px; align-items: center; gap: 12px; min-height: 66px; border-bottom: 1px solid #e5e6e7; font-size: 15px; }
+.wechat-proof__setting-value { color: #969ba0; font-size: 12px; }
+.wechat-proof__setting > span:last-child { color: #b9bec2; font-size: 23px; }
+.wechat-proof__at { font-size: 22px; line-height: 1; }
+.wechat-proof__note { margin: 0; padding: 13px 16px; color: #777b80; text-align: center; font-size: 11px; }
+
+/* Douyin image-post proof: content hierarchy from the supplied references, without a device frame. */
+.douyin-proof { width: min(100%, 520px); margin: 0 auto; background: #fff; color: #22252b; border: 1px solid #dedfe2; }
+.douyin-proof__header { display: grid; grid-template-columns: 20px 38px minmax(0, 1fr) auto 22px; align-items: center; gap: 10px; min-height: 62px; padding: 8px 12px; }
+.douyin-proof__header strong { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 14px; }
+.douyin-proof__back { font-size: 30px; line-height: 1; }
+.douyin-proof__avatar { display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid #b8bbc1; border-radius: 50%; font-size: 15px; }
+.douyin-proof__follow { color: #d14c64; border: 1px solid #e7a7b3; border-radius: 4px; padding: 4px 13px; }
+.douyin-proof__media { position: relative; display: flex; align-items: center; justify-content: center; width: 100%; aspect-ratio: 3 / 4; background: #f5f5f5; overflow: hidden; }
+.douyin-proof__media:focus-visible { outline: 2px solid Highlight; outline-offset: -3px; }
+.douyin-proof__image, .douyin-proof__media > video { display: block; width: 75%; height: 100%; padding: 0; background: #111; border: 0; }
+.douyin-proof__image img, .douyin-proof__media > video { width: 100%; height: 100%; object-fit: contain; }
+.douyin-proof__media > video { width: 75%; }
+.douyin-proof__empty { color: #676b70; }
+.douyin-proof__counter { position: absolute; right: 11px; top: 12px; padding: 3px 7px; background: #d9dadd; border-radius: 5px; font-size: 12px; }
+.douyin-proof__previous, .douyin-proof__next { position: absolute; top: 48%; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: rgb(255 255 255 / 90%); font-size: 24px; line-height: 24px; }
+.douyin-proof__previous { left: 6px; }
+.douyin-proof__next { right: 6px; }
+.douyin-proof__previous:disabled, .douyin-proof__next:disabled { opacity: .3; }
+.douyin-proof__motion { position: absolute; right: 10px; bottom: 28px; background: rgb(0 0 0 / 70%); color: white; border: 0; border-radius: 4px; }
+.douyin-proof__segments { position: absolute; left: 12px; right: 12px; bottom: 11px; display: flex; gap: 4px; }
+.douyin-proof__segments span { height: 3px; flex: 1; border-radius: 3px; background: rgb(255 255 255 / 52%); box-shadow: 0 1px 2px rgb(0 0 0 / 30%); }
+.douyin-proof__segments span.seen { background: white; }
+.douyin-proof__segments progress { width: 100%; height: 4px; accent-color: white; }
+.douyin-proof__topic { display: flex; justify-content: space-between; gap: 8px; padding: 11px 14px; border-bottom: 1px solid #e5e5e5; background: #f7f7f7; }
+.douyin-proof__topic strong { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.douyin-proof__topic > span { flex-shrink: 0; color: #74777d; }
+.douyin-proof__copy { padding: 14px 16px 16px; }
+.douyin-proof__caption { margin: 0; font-size: 16px; line-height: 1.75; }
+.douyin-proof__hashtag { color: #245b83; }
+.douyin-proof__related { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; margin-top: 16px; font-size: 13px; }
+.douyin-proof__search-chip { display: inline-flex; align-items: center; gap: 5px; min-width: 0; max-width: 100%; padding: 5px 9px; border-radius: 5px; background: #f5f6f7; overflow-wrap: anywhere; }
+.douyin-proof__search-chip svg { width: 15px; height: 15px; flex-shrink: 0; }
+.douyin-proof__footer { display: grid; grid-template-columns: minmax(0, 1.8fr) repeat(4, minmax(0, 1fr)); align-items: center; gap: 4px; border-top: 1px solid #e8e8e8; padding: 10px 9px; text-align: center; }
+.douyin-proof__footer > span:not(:first-child) { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10px; }
+.douyin-proof__reply { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: left; padding: 7px 9px; border-radius: 20px; background: #f4f4f4; color: #787b80; }
+.douyin-proof__note { margin: 0; padding: 5px 12px 9px; text-align: center; font-size: 11px; color: #74777d; }
 
 /* Native dialog behavior with only positioning and scroll containment. */
 .modal-backdrop { position: fixed; inset: 0; background: rgb(0 0 0 / 40%); display: grid; place-items: center; padding: 16px; z-index: 50; }

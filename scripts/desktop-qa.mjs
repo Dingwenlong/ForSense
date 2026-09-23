@@ -93,15 +93,35 @@ try {
   assert.equal(await page.locator('.preview-image').count(), 3);
   assert.equal(await page.locator('.layout-caption').innerText(), caption);
   assert.equal(await page.getByRole('textbox', { name: '发布文案', exact: true }).count(), 0);
+  assert.equal(await page.locator('.wechat-proof__grid .wechat-proof__photo').count(), 3);
+  assert.equal(await page.locator('.wechat-proof__setting').count(), 3);
+  assert.equal(await page.getByRole('button', { name: '发表', exact: true }).count(), 0);
+  await page.screenshot({ path: path.join(output, '05-wechat-review.png') });
+  await page.locator('.wechat-proof').screenshot({ path: path.join(output, '05-wechat-card.png') });
   record('Back, forward and direct step navigation save the draft and show only review content');
 
   await go('1 图片素材');
   await page.locator('.platform-choice').getByRole('button', { name: '抖音图文', exact: true }).click();
   await go('3 预览导出');
   await page.getByRole('button', { name: '下一张', exact: true }).click();
-  assert.equal(await page.locator('.image-counter').innerText(), '2 / 3');
+  assert.equal(await page.locator('.image-counter').innerText(), '2/3');
+  assert.equal(await page.locator('.douyin-proof__header').count(), 1);
+  assert.equal(await page.locator('.douyin-proof__segments span').count(), 3);
+  assert.equal(await page.locator('.douyin-proof__hashtag').count(), 2);
+  await page.locator('.douyin-proof__media').focus();
+  await page.keyboard.press('ArrowRight');
+  assert.equal(await page.locator('.image-counter').innerText(), '3/3');
+  await page.keyboard.press('ArrowRight');
+  assert.equal(await page.locator('.image-counter').innerText(), '3/3');
+  await page.keyboard.press('ArrowLeft');
+  assert.equal(await page.locator('.image-counter').innerText(), '2/3');
+  assert.equal(await page.locator('.layout-caption').innerText(), caption);
+  await page.locator('.douyin-proof__media').evaluate(element => element.blur());
   await page.screenshot({ path: path.join(output, '05-review.png') });
-  record('Changing platform in the media step updates the later review page');
+  await page.locator('.douyin-proof__footer').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: path.join(output, '05-douyin-lower.png') });
+  await page.locator('.page-body').evaluate(element => { element.scrollTop = 0; });
+  record('Douyin review uses the reference hierarchy, highlights caption tags and supports bounded image navigation');
 
   await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1080, 720));
   await waitFor(async () => await page.evaluate(() => window.innerWidth <= 1080));
@@ -195,6 +215,7 @@ try {
   await page.getByRole('textbox', { name: '发布文案', exact: true }).fill('只有文字也能保存。');
   await page.getByRole('button', { name: '下一步：预览导出', exact: true }).click();
   await page.getByRole('heading', { name: '预览与导出', exact: true }).waitFor();
+  assert.equal(await page.locator('.douyin-proof').count(), 1);
   assert.equal(await page.getByRole('button', { name: '导出素材包', exact: true }).isEnabled(), true);
   await page.getByRole('button', { name: '导出素材包', exact: true }).click();
   await selectFiles([exportParent]);
