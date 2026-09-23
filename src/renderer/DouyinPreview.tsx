@@ -1,4 +1,6 @@
+import { useRef, useState } from 'react';
 import type { Draft, MediaAsset } from '../shared/types';
+import { acceptsPreviewDrag, beginPreviewDrag, previewDragSource } from './previewDrag';
 
 function Glyph({ kind }: { kind: 'search' | 'heart' | 'comment' | 'star' | 'share' }) {
   const common = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
@@ -11,12 +13,19 @@ function Glyph({ kind }: { kind: 'search' | 'heart' | 'comment' | 'star' | 'shar
   </svg>;
 }
 
-export function DouyinPreview({ draft, current, index, playing, setPlaying, onView, next }: {
-  draft: Draft; current: MediaAsset | undefined; index: number; playing: boolean;
-  setPlaying: (value: boolean) => void; onView: (asset: MediaAsset) => void; next: (direction: number) => void;
+export function DouyinPreview({ draft, busy, current, index, playing, setPlaying, onEdit, onReorder, next }: {
+  draft: Draft; busy: boolean; current: MediaAsset | undefined; index: number; playing: boolean;
+  setPlaying: (value: boolean) => void; onEdit: (asset: MediaAsset) => void;
+  onReorder: (from: number, to: number) => void; next: (direction: number) => void;
 }) {
+  const [dropIndex, setDropIndex] = useState<number | null>(null);
+  const suppressClick = useRef(false);
   const tags = [...new Set([...draft.caption.matchAll(/#[^\s#]+/gu)].map(match => match[0]))];
   const captionParts = draft.caption.split(/(#[^\s#]+)/gu);
+  const targetOnBar = (clientX: number, left: number, width: number) =>
+    Math.max(0, Math.min(draft.items.length - 1, Math.floor(((clientX - left) / width) * draft.items.length)));
+  const targetOnStage = (clientX: number, left: number, width: number) =>
+    clientX < left + width * .33 ? Math.max(0, index - 1) : clientX > left + width * .67 ? Math.min(draft.items.length - 1, index + 1) : index;
   return <div className="douyin-proof" aria-label="抖音图文排版预览">
     <div className="douyin-proof__header" aria-label="账号信息示意">
       <span className="douyin-proof__back" aria-hidden="true">‹</span>
@@ -26,6 +35,9 @@ export function DouyinPreview({ draft, current, index, playing, setPlaying, onVi
       <Glyph kind="search"/>
     </div>
     <div className="douyin-proof__media" tabIndex={current ? 0 : -1} role="group" aria-label="图文图片，可使用左右方向键翻页"
+      onDragOver={event => { if (busy || !acceptsPreviewDrag(event)) return; event.preventDefault(); event.dataTransfer.dropEffect = 'move'; const rect = event.currentTarget.getBoundingClientRect(); setDropIndex(targetOnStage(event.clientX, rect.left, rect.width)); }}
+      onDragLeave={() => setDropIndex(null)}
+      onDrop={event => { if (busy) return; const from = previewDragSource(event, draft); if (from < 0) return; event.preventDefault(); event.stopPropagation(); const rect = event.currentTarget.getBoundingClientRect(); const to = targetOnStage(event.clientX, rect.left, rect.width); setDropIndex(null); if (from !== to) onReorder(from, to); }}
       onKeyDown={event => {
         if (draft.items.length < 2) return;
         if (event.key === 'ArrowLeft') { event.preventDefault(); next(-1); }
@@ -33,15 +45,22 @@ export function DouyinPreview({ draft, current, index, playing, setPlaying, onVi
       }}>
       {current ? <>
         {playing && current.videoUrl ? <video src={current.videoUrl} autoPlay loop controls playsInline aria-label={current.name}/>
-          : <button className="douyin-proof__image" aria-label={`查看 ${current.name}`} onClick={() => onView(current)}><img src={current.imageUrl} alt={current.name}/></button>}
+          : <button className="douyin-proof__image" aria-label={`编辑 ${current.name}`} draggable={!busy} disabled={busy}
+              onClick={() => { if (!suppressClick.current) onEdit(current); }}
+              onDragStart={event => { suppressClick.current = true; beginPreviewDrag(event, current.id); }}
+              onDragEnd={() => { setDropIndex(null); window.setTimeout(() => { suppressClick.current = false; }, 0); }}>
+              <img src={current.imageUrl} alt={current.name} draggable={false}/>
+            </button>}
         <span className="image-counter douyin-proof__counter">{index + 1}/{draft.items.length}</span>
         {draft.items.length > 1 && <>
           <button className="douyin-proof__previous" aria-label="上一张" onClick={() => next(-1)} disabled={index === 0}>‹</button>
           <button className="douyin-proof__next" aria-label="下一张" onClick={() => next(1)} disabled={index === draft.items.length - 1}>›</button>
         </>}
         {current.kind === 'live' && <button className="douyin-proof__motion" onClick={() => setPlaying(!playing)}>{playing ? '暂停实况' : '播放实况'}</button>}
-        <div className="douyin-proof__segments" aria-label={`第 ${index + 1} 张，共 ${draft.items.length} 张`}>
-          {draft.items.length <= 18 ? draft.items.map((item, position) => <span key={item.id} className={position <= index ? 'seen' : ''}/> )
+        <div className="douyin-proof__segments" aria-label={`第 ${index + 1} 张，共 ${draft.items.length} 张`}
+          onDragOver={event => { if (busy || !acceptsPreviewDrag(event)) return; event.preventDefault(); event.stopPropagation(); event.dataTransfer.dropEffect = 'move'; const rect = event.currentTarget.getBoundingClientRect(); setDropIndex(targetOnBar(event.clientX, rect.left, rect.width)); }}
+          onDrop={event => { if (busy) return; const from = previewDragSource(event, draft); if (from < 0) return; event.preventDefault(); event.stopPropagation(); const rect = event.currentTarget.getBoundingClientRect(); const to = targetOnBar(event.clientX, rect.left, rect.width); setDropIndex(null); if (from !== to) onReorder(from, to); }}>
+          {draft.items.length <= 18 ? draft.items.map((item, position) => <span key={item.id} className={`${position <= index ? 'seen' : ''} ${position === dropIndex ? 'drop-target' : ''}`}/> )
             : <progress max={draft.items.length} value={index + 1}/>}
         </div>
       </> : <p className="douyin-proof__empty">（暂无图片）</p>}

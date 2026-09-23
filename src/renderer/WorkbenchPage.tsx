@@ -80,7 +80,7 @@ export function WorkbenchPage({ draft, busy, change, importFiles, openVideo, reo
       <div className="workbench-preview-head"><div><h1>实时预览</h1><span>{draft.items.length} 张图片 · {Array.from(draft.caption).length} 字</span></div>
         <button disabled={busy || (!draft.items.length && !draft.caption.trim())} onClick={exportPackage}>导出素材包</button>
       </div>
-      <div className="workbench-preview-scroll"><Preview draft={draft}/></div>
+      <div className="workbench-preview-scroll"><Preview draft={draft} busy={busy} onEdit={edit} onReorder={reorder}/></div>
     </div>
   </section>;
 }

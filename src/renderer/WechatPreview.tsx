@@ -1,4 +1,6 @@
+import { useRef, useState } from 'react';
 import type { Draft, MediaAsset } from '../shared/types';
+import { acceptsPreviewDrag, beginPreviewDrag, previewDragSource } from './previewDrag';
 
 function SettingIcon({ kind }: { kind: 'location' | 'mention' | 'audience' }) {
   if (kind === 'mention') return <span className="wechat-proof__at" aria-hidden="true">@</span>;
@@ -8,7 +10,12 @@ function SettingIcon({ kind }: { kind: 'location' | 'mention' | 'audience' }) {
   </svg>;
 }
 
-export function WechatPreview({ draft, onView }: { draft: Draft; onView: (asset: MediaAsset) => void }) {
+export function WechatPreview({ draft, busy, onEdit, onReorder, onPlay }: {
+  draft: Draft; busy: boolean; onEdit: (asset: MediaAsset) => void;
+  onReorder: (from: number, to: number) => void; onPlay: (asset: MediaAsset) => void;
+}) {
+  const [dropIndex, setDropIndex] = useState<number | null>(null);
+  const suppressClick = useRef(false);
   return <div className="wechat-proof" aria-label="微信朋友圈发表排版预览">
     <div className="wechat-proof__header" aria-label="发表栏示意">
       <span>取消</span><span className="wechat-proof__publish">发表</span>
@@ -18,11 +25,19 @@ export function WechatPreview({ draft, onView }: { draft: Draft; onView: (asset:
     </p>
     <div className="wechat-proof__photos" aria-label="朋友圈图片九宫格">
       {draft.items.length ? <div className="wechat-proof__grid">
-        {draft.items.slice(0, 9).map((item, position) => <button key={item.id} className="preview-image wechat-proof__photo"
-          onClick={() => onView(item)} aria-label={`查看第 ${position + 1} 张：${item.name}`}>
-          <img src={item.imageUrl} alt={item.name}/>
-          {item.kind === 'live' && <span className="wechat-proof__live">实况</span>}
-        </button>)}
+        {draft.items.slice(0, 9).map((item, position) => <div key={item.id} className="wechat-proof__tile">
+          <button className={`preview-image wechat-proof__photo ${dropIndex === position ? 'drop-target' : ''}`}
+            draggable={!busy} disabled={busy} aria-label={`编辑第 ${position + 1} 张：${item.name}`}
+            onClick={() => { if (!suppressClick.current) onEdit(item); }}
+            onDragStart={event => { suppressClick.current = true; beginPreviewDrag(event, item.id); }}
+            onDragEnd={() => { setDropIndex(null); window.setTimeout(() => { suppressClick.current = false; }, 0); }}
+            onDragOver={event => { if (busy || !acceptsPreviewDrag(event)) return; event.preventDefault(); event.dataTransfer.dropEffect = 'move'; setDropIndex(position); }}
+            onDragLeave={() => setDropIndex(null)}
+            onDrop={event => { if (busy) return; const from = previewDragSource(event, draft); if (from < 0) return; event.preventDefault(); event.stopPropagation(); setDropIndex(null); if (from !== position) onReorder(from, position); }}>
+            <img src={item.imageUrl} alt={item.name} draggable={false}/>
+          </button>
+          {item.kind === 'live' && <button className="wechat-proof__live" onClick={() => onPlay(item)} aria-label={`播放第 ${position + 1} 张实况`}>实况 ▶</button>}
+        </div>)}
       </div> : <p className="wechat-proof__empty">（暂无图片）</p>}
       {draft.items.length > 9 && <p className="wechat-proof__overflow">九宫格预览前 9 张；草稿共 {draft.items.length} 张，导出保留全部素材。</p>}
     </div>

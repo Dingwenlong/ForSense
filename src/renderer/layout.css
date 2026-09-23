@@ -71,9 +71,12 @@ img, video { max-width: 100%; }
 .wechat-proof__placeholder { color: #a5a7aa; }
 .wechat-proof__photos { padding: 0 18px 28px; }
 .wechat-proof__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
-.wechat-proof__photo { display: block; width: 100%; aspect-ratio: 1; padding: 0; border: 0; background: #eef0f2; overflow: hidden; }
+.wechat-proof__tile { position: relative; min-width: 0; aspect-ratio: 1; }
+.wechat-proof__photo { display: block; width: 100%; height: 100%; padding: 0; border: 0; background: #eef0f2; overflow: hidden; cursor: grab; }
+.wechat-proof__photo:active { cursor: grabbing; }
+.wechat-proof__photo.drop-target { outline: 3px solid #08b465; outline-offset: -3px; }
 .wechat-proof__photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.wechat-proof__live { position: absolute; right: 4px; bottom: 4px; padding: 2px 4px; color: #fff; background: rgb(0 0 0 / 70%); font-size: 10px; }
+.wechat-proof__live { position: absolute; right: 4px; bottom: 4px; padding: 2px 4px; color: #fff; background: rgb(0 0 0 / 70%); border: 0; font-size: 10px; }
 .wechat-proof__empty { margin: 0; padding: 35px 0; color: #777b80; }
 .wechat-proof__overflow { font-size: 11px; color: #686c72; }
 .wechat-proof__settings { margin: 0 18px; border-top: 1px solid #e5e6e7; }
@@ -93,6 +96,8 @@ img, video { max-width: 100%; }
 .douyin-proof__media { position: relative; display: flex; align-items: center; justify-content: center; width: 100%; aspect-ratio: 3 / 4; background: #f5f5f5; overflow: hidden; }
 .douyin-proof__media:focus-visible { outline: 2px solid Highlight; outline-offset: -3px; }
 .douyin-proof__image, .douyin-proof__media > video { display: block; width: 75%; height: 100%; padding: 0; background: #111; border: 0; }
+.douyin-proof__image { cursor: grab; }
+.douyin-proof__image:active { cursor: grabbing; }
 .douyin-proof__image img, .douyin-proof__media > video { width: 100%; height: 100%; object-fit: contain; }
 .douyin-proof__media > video { width: 75%; }
 .douyin-proof__empty { color: #676b70; }
@@ -102,9 +107,10 @@ img, video { max-width: 100%; }
 .douyin-proof__next { right: 6px; }
 .douyin-proof__previous:disabled, .douyin-proof__next:disabled { opacity: .3; }
 .douyin-proof__motion { position: absolute; right: 10px; bottom: 28px; background: rgb(0 0 0 / 70%); color: white; border: 0; border-radius: 4px; }
-.douyin-proof__segments { position: absolute; left: 12px; right: 12px; bottom: 11px; display: flex; gap: 4px; }
+.douyin-proof__segments { position: absolute; left: 12px; right: 12px; bottom: 0; display: flex; align-items: flex-end; gap: 4px; min-height: 32px; padding-bottom: 11px; }
 .douyin-proof__segments span { height: 3px; flex: 1; border-radius: 3px; background: rgb(255 255 255 / 52%); box-shadow: 0 1px 2px rgb(0 0 0 / 30%); }
 .douyin-proof__segments span.seen { background: white; }
+.douyin-proof__segments span.drop-target { height: 6px; background: #fe2c55; }
 .douyin-proof__segments progress { width: 100%; height: 4px; accent-color: white; }
 .douyin-proof__topic { display: flex; justify-content: space-between; gap: 8px; padding: 11px 14px; border-bottom: 1px solid #e5e5e5; background: #f7f7f7; }
 .douyin-proof__topic strong { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }

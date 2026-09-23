@@ -70,22 +70,34 @@ try {
   await waitFor(async () => await cards().count() === 3);
   assert.equal(await page.locator('.wechat-proof__photo').count(), 3);
   const first = await page.locator('.wechat-proof__photo img').first().getAttribute('src');
-  await page.getByRole('button', { name: '后移第 1 张', exact: true }).click();
+  await page.locator('.wechat-proof__photo').first().dragTo(page.locator('.wechat-proof__photo').nth(2));
   assert.notEqual(await page.locator('.wechat-proof__photo img').first().getAttribute('src'), first);
-  await page.getByRole('button', { name: '编辑第 1 张图片', exact: true }).click();
+  assert.equal(await page.locator('.wechat-proof__photo img').nth(2).getAttribute('src'), first);
+  assert.equal(await cards().nth(2).locator('img').getAttribute('src'), first);
+  await page.locator('.wechat-proof__photo').first().click();
+  await page.getByRole('dialog', { name: '调整画面' }).waitFor();
   await page.getByRole('button', { name: '1:1', exact: true }).click();
   await page.screenshot({ path: path.join(output, '03-crop.png') });
   await page.getByRole('button', { name: '应用调整', exact: true }).click();
   await page.getByRole('dialog', { name: '调整画面' }).waitFor({ state: 'hidden' });
   assert.match(await cards().first().innerText(), /900 × 900/);
   await page.screenshot({ path: path.join(output, '04-live-media.png') });
-  record('Image import, reordering and crop appear immediately in the adjacent preview');
+  record('Holding and dropping a WeChat preview image reorders the draft; one click opens image editing');
 
   await page.locator('.platform-choice').getByRole('button', { name: '抖音图文', exact: true }).click();
   assert.equal(await page.locator('.douyin-proof').count(), 1);
   await page.getByRole('button', { name: '下一张', exact: true }).click();
   assert.equal(await page.locator('.image-counter').innerText(), '2/3');
   assert.equal(await page.locator('.douyin-proof__hashtag').count(), 2);
+  const movingImage = await page.locator('.douyin-proof__image img').getAttribute('src');
+  const bar = await page.locator('.douyin-proof__segments').boundingBox();
+  await page.locator('.douyin-proof__image').dragTo(page.locator('.douyin-proof__segments'), { targetPosition: { x: bar.width * .86, y: bar.height / 2 } });
+  assert.equal(await page.locator('.image-counter').innerText(), '3/3');
+  assert.equal(await page.locator('.douyin-proof__image img').getAttribute('src'), movingImage);
+  assert.equal(await cards().nth(2).locator('img').getAttribute('src'), movingImage);
+  const stage = await page.locator('.douyin-proof__media').boundingBox();
+  await page.locator('.douyin-proof__image').dragTo(page.locator('.douyin-proof__media'), { targetPosition: { x: stage.width * .06, y: stage.height * .48 } });
+  assert.equal(await page.locator('.image-counter').innerText(), '2/3');
   await page.locator('.douyin-proof__media').focus();
   await page.keyboard.press('ArrowRight');
   assert.equal(await page.locator('.image-counter').innerText(), '3/3');
@@ -93,9 +105,12 @@ try {
   assert.equal(await page.locator('.image-counter').innerText(), '3/3');
   await page.keyboard.press('ArrowLeft');
   assert.equal(await page.locator('.image-counter').innerText(), '2/3');
+  await page.locator('.douyin-proof__image').click();
+  await page.getByRole('dialog', { name: '调整画面' }).waitFor();
+  await page.getByRole('button', { name: '取消', exact: true }).click();
   await page.locator('.douyin-proof__media').evaluate(element => element.blur());
   await page.screenshot({ path: path.join(output, '05-douyin-preview.png') });
-  record('Platform switch preserves draft and the Douyin carousel and caption remain functional');
+  record('Douyin preview supports drag-to-progress, sideways drag, keyboard paging and single-click image editing');
 
   await tab('文案').click();
   assert.equal(await page.getByRole('textbox', { name: '发布文案', exact: true }).inputValue(), caption);
@@ -155,6 +170,9 @@ try {
   await page.getByRole('button', { name: '返回图文', exact: true }).click();
   assert.equal(await page.locator('.asset-live').count(), 1);
   assert.equal(await page.locator('.wechat-proof__photo').count(), 5);
+  await page.locator('.wechat-proof__live').click();
+  await page.getByRole('dialog', { name: '实况预览' }).waitFor();
+  await page.getByRole('button', { name: '关闭窗口', exact: true }).click();
   record('Video frame and Live Photo generated from the editor update the visible preview');
 
   await page.getByRole('button', { name: '导出素材包', exact: true }).click();
