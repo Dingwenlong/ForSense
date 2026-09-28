@@ -5,6 +5,7 @@ import { pipeline } from 'node:stream/promises';
 import { ZipFile } from 'yazl';
 import { z } from 'zod';
 import type { ExportJob, JobKind, Edits } from '../shared/types';
+import { draftName } from '../shared/draft-name';
 import { Store, editsSchema, uuid, type AssetRecord } from './store';
 import { inside, availablePath, messageOf, safeName } from './io';
 import { type Tools, probe, runProcess, transcode, checkCancelled, Cancelled } from './process';
@@ -210,7 +211,7 @@ export class MediaService {
       for (const entry of manifest) for (const name of entry.files) hashes.push({ file: name, sha256: createHash('sha256').update(await fs.readFile(inside(temp, name))).digest('hex') });
       await fs.writeFile(inside(temp, '素材清单.json'), JSON.stringify({ version: 1, platform: draft.platform, items: manifest, hashes, deviceVerification: 'pending' }, null, 2), 'utf8');
       checkCancelled(signal);
-      const destination = await availablePath(parent, safeName(draft.title), options.format === 'zip' ? '.zip' : '');
+      const destination = await availablePath(parent, safeName(draftName(draft.caption)), options.format === 'zip' ? '.zip' : '');
       if (options.format === 'zip') {
         zipTemporary = inside(parent, `.social-copy-${randomUUID()}.zip.tmp`);
         const zip = new ZipFile();

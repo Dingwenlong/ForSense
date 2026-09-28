@@ -56,8 +56,9 @@ try {
   await page.screenshot({ path: path.join(output, '02-empty-preview.png') });
   record('Preview contains an image placeholder and inline caption with no left editor');
 
-  const title = page.getByRole('textbox', { name: '草稿标题', exact: true });
-  await title.fill('海边的慢日子');
+  assert.equal(await page.getByRole('textbox', { name: '草稿标题', exact: true }).count(), 0);
+  const originalDraftId = await page.evaluate(async () => (await window.desktop.listDrafts()).drafts[0].id);
+  const originalCard = () => page.locator(`.library-card[data-draft-id="${originalDraftId}"]`);
   const caption = '把时间留给风，把心情留给海。\n\n走走停停，收集一些简单的快乐。🌊\n#周末日常 #慢生活';
   await page.getByRole('textbox', { name: '发布文案', exact: true }).fill(caption);
   await page.getByRole('button', { name: '复制文案', exact: true }).click();
@@ -131,15 +132,21 @@ try {
   record('Preview controls and export remain accessible in the minimum desktop window');
 
   await page.getByRole('button', { name: '另存草稿', exact: true }).click();
-  await page.getByRole('textbox', { name: '新草稿名称', exact: true }).fill('海边的慢日子 · 副本');
-  await page.getByRole('button', { name: '保存新草稿', exact: true }).click();
-  await waitFor(async () => (await title.inputValue()).endsWith('副本'));
+  await page.getByText('已另存为新草稿，原草稿保留', { exact: true }).waitFor();
+  const copies = await page.evaluate(() => window.desktop.listDrafts());
+  assert.equal(copies.drafts.length, 2);
+  assert.ok(copies.drafts.every(d => d.caption === douyinCaption && !('title' in d)));
+  await dismissNotice();
+  await page.getByRole('button', { name: '编辑发布文案', exact: true }).click();
+  await page.getByRole('textbox', { name: '发布文案', exact: true }).fill('副本文案：' + douyinCaption);
+  await page.locator('.douyin-proof__header').click();
   await page.locator('.douyin-proof__image').click();
   await page.getByRole('dialog', { name: '调整画面' }).getByRole('button', { name: '移除图片', exact: true }).click();
   await waitFor(async () => (await page.locator('.image-counter').innerText()).endsWith('/3'));
   await page.getByRole('button', { name: '返回草稿列表', exact: true }).click();
   await page.getByRole('heading', { name: '我的草稿', exact: true }).waitFor();
   assert.equal(await page.locator('.library-card').count(), 2);
+  assert.equal(await originalCard().locator('.draft-caption-name').innerText(), douyinCaption.replace(/\s+/g, ' ').trim());
   await page.getByRole('textbox', { name: '搜索草稿', exact: true }).fill('没有这个标题');
   assert.equal(await page.locator('.library-card').count(), 0);
   await page.getByRole('button', { name: '清空搜索', exact: true }).click();
@@ -154,19 +161,19 @@ try {
   assert.equal(await page.locator('.library-card').count(), 1);
   await page.getByRole('button', { name: '清空搜索', exact: true }).click();
   await page.getByRole('combobox', { name: '添加平台标签', exact: true }).selectOption('douyin');
-  await page.getByRole('textbox', { name: '搜索草稿', exact: true }).fill('海边 慢');
+  await page.getByRole('textbox', { name: '搜索草稿', exact: true }).fill('时间 慢生活');
   assert.equal(await page.locator('.library-card').count(), 2);
   await page.screenshot({ path: path.join(output, '12-tag-search.png') });
   await page.getByRole('button', { name: '清空搜索', exact: true }).click();
-  await page.locator('.library-card').filter({ hasNotText: '副本' }).locator('.library-card-open').click();
+  await originalCard().locator('.library-card-open').click();
   await page.getByRole('button', { name: '返回草稿列表', exact: true }).click();
   await page.locator('.library-card').filter({ hasText: '副本' }).getByRole('button', { name: /^删除草稿 / }).click();
   await page.getByRole('dialog', { name: '删除这份草稿？' }).getByRole('button', { name: '删除草稿', exact: true }).click();
   await page.getByRole('dialog', { name: '删除这份草稿？' }).waitFor({ state: 'hidden' });
   await page.getByRole('heading', { name: '我的草稿', exact: true }).waitFor();
   assert.equal(await page.locator('.library-card').count(), 1);
-  await page.locator('.library-card').filter({ hasText: '海边的慢日子' }).locator('.library-card-open').click();
-  record('Save as preserves the original; platform tags combine with keywords; deletion works from the list');
+  await originalCard().locator('.library-card-open').click();
+  record('Caption supplies the draft name; save-as preserves text without naming; search and deletion keep the original intact');
 
   await page.getByRole('button', { name: '从视频取材', exact: true }).click();
   await selectFiles([inputVideo]);
@@ -214,7 +221,7 @@ try {
   await page.getByRole('textbox', { name: '发布文案', exact: true }).fill(douyinCaption + '\n刚刚补上的一句。');
   await application.close(); application = null;
   await launch();
-  await page.locator('.library-card').filter({ hasText: '海边的慢日子' }).locator('.library-card-open').click();
+  await originalCard().locator('.library-card-open').click();
   assert.equal(await page.getByRole('textbox', { name: '发布文案', exact: true }).inputValue(), douyinCaption + '\n刚刚补上的一句。');
   assert.equal(await photos().count(), 6);
   record('Closing while editing inline caption flushes the draft for restart');
@@ -355,7 +362,7 @@ try {
   await page.getByRole('button', { name: '清空搜索', exact: true }).click();
   const capacity = await page.evaluate(async () => {
     const { drafts } = await window.desktop.listDrafts();
-    const results = await Promise.allSettled([window.desktop.createDraft('moments'), window.desktop.saveDraftAs(drafts[0].id, '超出上限')]);
+    const results = await Promise.allSettled([window.desktop.createDraft('moments'), window.desktop.saveDraftAs(drafts[0].id)]);
     return { rejected: results.every(result => result.status === 'rejected'), count: (await window.desktop.listDrafts()).drafts.length };
   });
   assert.deepEqual(capacity, { rejected: true, count: 10 });

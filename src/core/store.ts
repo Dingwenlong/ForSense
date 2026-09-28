@@ -4,13 +4,14 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { Draft, Edits, MediaAsset, Platform, VideoSource, LibrarySnapshot } from '../shared/types';
 import { MAX_DRAFTS } from '../shared/types';
+import { draftName } from '../shared/draft-name';
 import { atomicJSON, inside } from './io';
 
 export const uuid = z.string().uuid();
 export const editsSchema = z.object({ rotation: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]),
   crop: z.object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1), width: z.number().min(0.01).max(1), height: z.number().min(0.01).max(1) })
     .refine(c => c.x + c.width <= 1.000001 && c.y + c.height <= 1.000001, '裁切范围超出画面').optional() });
-export const draftInput = z.object({ version: z.literal(1), id: uuid, title: z.string().trim().min(1).max(120), platform: z.enum(['moments', 'douyin']),
+export const draftInput = z.object({ version: z.literal(1), id: uuid, platform: z.enum(['moments', 'douyin']),
   caption: z.string().max(100000), items: z.array(z.object({ id: uuid })).max(200), createdAt: z.string(), updatedAt: z.string() });
 export interface AssetRecord {
   id: string; kind: 'image' | 'live'; name: string; width: number; height: number;
@@ -60,7 +61,7 @@ export class Store {
       try {
         const record = await this.asset(entry.name);
         const createdAt = record.createdAt || (await fs.stat(path.join(this.directory('assets', entry.name), 'asset.json'))).birthtime.toISOString();
-        assets.push({ ...this.publicAsset(record), createdAt, usedBy: drafts.filter(d => d.items.some(i => i.id === record.id)).map(d => d.title) });
+        assets.push({ ...this.publicAsset(record), createdAt, usedBy: drafts.filter(d => d.items.some(i => i.id === record.id)).map(d => draftName(d.caption)) });
       } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') warnings.push('一份素材记录无法读取，文件仍保留。'); }
     }
     for (const entry of await fs.readdir(inside(this.root, 'sources'), { withFileTypes: true })) {
@@ -105,7 +106,7 @@ export class Store {
   }
   async create(platform: Platform): Promise<Draft> {
     const now = new Date().toISOString();
-    const draft: Draft = { version: 1, id: randomUUID(), title: '未命名草稿', platform: z.enum(['moments', 'douyin']).parse(platform), caption: '', items: [], createdAt: now, updatedAt: now };
+    const draft: Draft = { version: 1, id: randomUUID(), platform: z.enum(['moments', 'douyin']).parse(platform), caption: '', items: [], createdAt: now, updatedAt: now };
     return this.addDraft(draft);
   }
   private async addDraft(draft: Draft): Promise<Draft> {
@@ -131,11 +132,10 @@ export class Store {
     this.writes.set(data.id, write);
     try { return await write; } finally { if (this.writes.get(data.id) === write) this.writes.delete(data.id); }
   }
-  async duplicate(id: string, title?: string) {
-    const name = title === undefined ? undefined : z.string().trim().min(1).max(120).parse(title);
+  async duplicate(id: string) {
     await this.writes.get(id);
     const original = await this.load(id), now = new Date().toISOString();
-    const draft = { ...original, id: randomUUID(), title: name ?? (original.title.slice(0, 115) + ' 副本'), createdAt: now, updatedAt: now };
+    const draft = { ...original, id: randomUUID(), createdAt: now, updatedAt: now };
     return this.addDraft(draft);
   }
   async remove(id: string) { await this.writes.get(id); await fs.unlink(this.draftFile(id)); }

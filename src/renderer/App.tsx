@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Draft, MediaAsset, VideoSource } from '../shared/types';
 import { MAX_DRAFTS } from '../shared/types';
+import { draftName } from '../shared/draft-name';
 import { useJobs, errorText } from './hooks';
 import { Modal } from './Modal';
 import { CropEditor } from './CropEditor';
@@ -19,7 +20,6 @@ export function App() {
   const [cropAsset, setCropAsset] = useState<MediaAsset | null>(null), [videoOpen, setVideoOpen] = useState(false), [videoSource, setVideoSource] = useState<VideoSource | null>(null);
   const [exportOpen, setExportOpen] = useState(false), [exportDirectory, setExportDirectory] = useState(''), [exportFormat, setExportFormat] = useState<'folder' | 'zip'>('folder'), [targets, setTargets] = useState<('apple' | 'android')[]>(['apple', 'android']);
   const [exportResult, setExportResult] = useState<string | null>(null), [deleteTarget, setDeleteTarget] = useState<Draft | null>(null);
-  const [saveAsOpen, setSaveAsOpen] = useState(false), [saveAsTitle, setSaveAsTitle] = useState('');
   const draftRef = useRef<Draft | null>(null), timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined), revision = useRef(0), dirty = useRef(false), saveQueue = useRef<Promise<unknown>>(Promise.resolve());
   const pageBody = useRef<HTMLElement>(null);
   useEffect(() => { pageBody.current?.scrollTo(0, 0); }, [page]);
@@ -38,7 +38,7 @@ export function App() {
   async function flush() {
     clearTimeout(timer.current);
     if (!draftRef.current || !dirty.current) { await saveQueue.current; return; }
-    const snapshot = { ...draftRef.current, title: draftRef.current.title.trim() || '未命名草稿' }, savedRevision = revision.current;
+    const snapshot = { ...draftRef.current }, savedRevision = revision.current;
     const next = saveQueue.current.catch(() => {}).then(() => window.desktop.saveDraft(snapshot));
     saveQueue.current = next;
     await next; if (savedRevision === revision.current) dirty.current = false;
@@ -133,7 +133,11 @@ export function App() {
         <WorkbenchPage draft={draft} busy={working} canSaveAs={drafts.length < MAX_DRAFTS} change={change} importFiles={importFiles} addImages={() => setAssetPicker('draft')}
           openVideo={() => setVideoOpen(true)} reorder={reorder} edit={setCropAsset}
           rejectVideoDrop={() => setNotice({ text: '视频请通过“从视频取材”打开', error: true })}
-          saveAs={() => { setSaveAsTitle((draft.title.trim() || '未命名草稿').slice(0, 115) + ' 副本'); setSaveAsOpen(true); }}
+          saveAs={() => void perform(async () => {
+            await flush(); const current = draftRef.current; if (!current) return;
+            const next = await window.desktop.saveDraftAs(current.id);
+            updateList(next); show(next); setNotice({ text: '已另存为新草稿，原草稿保留' });
+          })}
           copy={() => void perform(async () => { await window.desktop.copyText(draft.caption); setNotice({ text: '文案已复制，可粘贴到发布页面' }); })}
           exportPackage={() => { setExportOpen(true); setExportResult(null); }}/>
       }
@@ -166,7 +170,7 @@ export function App() {
         <button onClick={() => void perform(() => window.desktop.reveal(exportResult))}>打开文件位置</button>
         {hasLive && <p>实况手机兼容性待验证，请先阅读包内的导入说明。</p>}
       </div> : <>
-        <p>{draft?.title || '未命名草稿'} · {draft?.items.length} 个素材</p>
+        <p>{draftName(draft?.caption || '')} · {draft?.items.length} 个素材</p>
         <fieldset><legend>保存位置</legend>
           <p className="destination-path">{exportDirectory || '尚未选择文件夹'}</p>
           <button disabled={working} onClick={() => void perform(async () => { const directory = await window.desktop.pickDirectory(); if (directory) setExportDirectory(directory); })}>选择位置</button>
@@ -188,19 +192,8 @@ export function App() {
         </footer>
       </>}
     </Modal>}
-    {saveAsOpen && <Modal title="另存草稿" onClose={() => setSaveAsOpen(false)} busy={working}>
-      <form onSubmit={e => { e.preventDefault(); if (working || !saveAsTitle.trim()) return; void perform(async () => {
-        await flush(); const current = draftRef.current; if (!current) return;
-        const next = await window.desktop.saveDraftAs(current.id, saveAsTitle);
-        updateList(next); show(next); setSaveAsOpen(false); setNotice({ text: '已另存为新草稿，原草稿保留' });
-      }); }}>
-        <label className="field-label">新草稿名称<input aria-label="新草稿名称" maxLength={120} value={saveAsTitle} disabled={working} onChange={e => setSaveAsTitle(e.target.value)}/></label>
-        <p>将当前素材、顺序、文案和预览平台保存为一份独立草稿，之后继续编辑新草稿。</p>
-        <footer className="modal-footer"><button type="button" disabled={working} onClick={() => setSaveAsOpen(false)}>取消</button><button type="submit" disabled={working || !saveAsTitle.trim()}>保存新草稿</button></footer>
-      </form>
-    </Modal>}
     {deleteTarget && <Modal title="删除这份草稿？" onClose={() => setDeleteTarget(null)} busy={working}>
-      <p>将删除「{deleteTarget.title}」的文案与素材排列，导入的原始文件不会被删除。</p>
+      <p>将删除「{draftName(deleteTarget.caption)}」的文案与素材排列，导入的原始文件不会被删除。</p>
       <footer className="modal-footer">
         <button onClick={() => setDeleteTarget(null)} disabled={working}>保留草稿</button>
         <button disabled={working} onClick={() => void perform(async () => {

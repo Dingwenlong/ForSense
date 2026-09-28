@@ -18,11 +18,6 @@ export function WorkbenchPage({ draft, busy, canSaveAs, change, importFiles, add
     onDragOver={event => { if (event.dataTransfer.types.includes('Files')) event.preventDefault(); }}
     onDrop={event => { if (!event.dataTransfer.files.length) return; event.preventDefault(); handleFiles(event.dataTransfer.files); }}>
     <div className="workbench-toolbar">
-      <label>草稿标题
-        <input aria-label="草稿标题" value={draft.title} disabled={busy} maxLength={120}
-          onChange={event => change({ title: event.target.value })}
-          onBlur={() => { if (!draft.title.trim()) change({ title: '未命名草稿' }); }}/>
-      </label>
       <div className="platform-control" role="group" aria-label="预览平台">
         <span>预览平台</span><span className={draft.platform === 'moments' ? 'platform-active' : ''}>微信</span>
         <button type="button" role="switch" aria-label="抖音预览" aria-checked={draft.platform === 'douyin'} disabled={busy} className="platform-switch"

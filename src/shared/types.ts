@@ -13,7 +13,7 @@ export interface LibraryAsset extends MediaAsset { usedBy: string[] }
 export interface LibrarySnapshot { assets: LibraryAsset[]; videos: Omit<VideoSource, 'frames'>[]; warnings: string[] }
 export interface AssetUpdate { name?: string; favorite?: boolean; archived?: boolean }
 export interface Draft {
-  version: 1; id: string; title: string; platform: Platform; caption: string;
+  version: 1; id: string; platform: Platform; caption: string;
   items: MediaAsset[]; createdAt: string; updatedAt: string;
 }
 export interface VideoSource {
@@ -36,7 +36,7 @@ export interface DesktopAPI {
   listDrafts(): Promise<{ drafts: Draft[]; warnings: string[] }>;
   createDraft(platform: Platform): Promise<Draft>;
   saveDraft(draft: Draft): Promise<Draft>;
-  saveDraftAs(id: string, title: string): Promise<Draft>;
+  saveDraftAs(id: string): Promise<Draft>;
   deleteDraft(id: string): Promise<void>;
   pickImages(): Promise<string[]>;
   pickVideo(): Promise<string | null>;

@@ -8,21 +8,22 @@ import { Store } from '../src/core/store';
 import { MediaService } from '../src/core/service';
 import { runProcess } from '../src/core/process';
 import type { MediaAsset } from '../src/shared/types';
+import { draftName } from '../src/shared/draft-name';
 
 const tools = { ffmpeg: path.resolve('resources/media/ffmpeg.exe'), ffprobe: path.resolve('resources/media/ffprobe.exe') };
 test('ten draft slots are shared by concurrent create and save-as; deletion frees a slot and legacy drafts remain', async () => {
   const root = await makeTestDirectory('social-copy-draft-limit-');
   const store = new Store(root); await store.init();
   const existing = await Promise.all(Array.from({ length: 9 }, () => store.create('moments')));
-  const attempts = await Promise.allSettled([store.create('douyin'), store.duplicate(existing[0].id, '另存'), store.create('moments')]);
+  const attempts = await Promise.allSettled([store.create('douyin'), store.duplicate(existing[0].id), store.create('moments')]);
   assert.equal(attempts.filter(r => r.status === 'fulfilled').length, 1);
   assert.equal(attempts.filter(r => r.status === 'rejected').length, 2);
   assert.equal((await store.list()).drafts.length, 10);
-  await assert.rejects(store.duplicate(existing[0].id, '第十一份'), /最多保留 10/);
+  await assert.rejects(store.duplicate(existing[0].id), /最多保留 10/);
   await store.save({ ...existing[0], caption: '达到上限后仍可修改原稿' });
   assert.equal((await store.load(existing[0].id)).caption, '达到上限后仍可修改原稿');
   await store.remove(existing[1].id);
-  const savedAs = await store.duplicate(existing[0].id, '释放名额后另存');
+  const savedAs = await store.duplicate(existing[0].id);
   assert.equal(savedAs.caption, '达到上限后仍可修改原稿');
   assert.equal((await store.list()).drafts.length, 10);
   const legacy = { ...existing[0], id: randomUUID(), title: '旧版保留的第十一份' };
@@ -30,7 +31,29 @@ test('ten draft slots are shared by concurrent create and save-as; deletion free
   const reopened = new Store(root); await reopened.init();
   assert.equal((await reopened.list()).drafts.length, 11);
   await assert.rejects(reopened.create('moments'), /最多保留 10/);
-  assert.equal((await reopened.load(legacy.id)).title, legacy.title);
+  assert.equal((await reopened.load(legacy.id)).caption, legacy.caption);
+  assert.equal('title' in await reopened.load(legacy.id), false);
+});
+test('caption-based names accept legacy drafts and preserve full text through save and save-as', async () => {
+  const root = await makeTestDirectory('social-copy-caption-');
+  const store = new Store(root); await store.init();
+  const draft = await store.create('moments');
+  const caption = '\n  海边散步 🌊\r\n\r\n和家人一起 👨‍👩‍👧‍👦  ';
+  const legacy = { ...draft, title: '旧的独立标题', caption };
+  await fs.writeFile(store.draftFile(draft.id), JSON.stringify(legacy));
+  const loaded = await store.load(draft.id);
+  assert.equal(loaded.caption, caption); assert.equal('title' in loaded, false);
+  assert.equal(draftName(loaded.caption), '海边散步 🌊 和家人一起 👨‍👩‍👧‍👦');
+  assert.equal(JSON.parse(await fs.readFile(store.draftFile(draft.id), 'utf8')).title, legacy.title);
+  const long = '开头 ' + '👨‍👩‍👧‍👦'.repeat(30) + '\n不应被截掉的正文尾部';
+  await store.save({ ...loaded, caption: long, title: '不能覆盖文案标题' });
+  assert.equal(JSON.parse(await fs.readFile(store.draftFile(draft.id), 'utf8')).title, undefined);
+  const copy = await store.duplicate(draft.id);
+  assert.notEqual(copy.id, draft.id); assert.equal(copy.caption, long);
+  assert.match(draftName(copy.caption), /^开头 (👨‍👩‍👧‍👦)+…$/u);
+  await store.save({ ...copy, caption: '  \n\t' });
+  assert.equal(draftName((await store.load(copy.id)).caption), '未填写文案');
+  assert.equal((await store.load(draft.id)).caption, long);
 });
 test('global library preserves shared drafts, migrates old records and retains manual optimization provenance', async () => {
   const root = await makeTestDirectory('social-copy-library-');
