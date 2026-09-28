@@ -17,7 +17,6 @@ export function Preview({ draft, busy, onEdit, onReorder, onAddImages, onCaption
         : <DouyinPreview draft={draft} busy={busy} current={current} index={safeIndex} playing={playing} setPlaying={setPlaying} onEdit={onEdit} onAddImages={onAddImages} onCaptionChange={onCaptionChange}
             onReorder={(from, to) => { onReorder(from, to); setIndex(to); }} next={next}/>}
     </div>
-    <p className="preview-note">{draft.platform === 'moments' ? '文案直接输入 · 单击图片编辑 · 拖动图片或按 Alt + 方向键排序' : '单击文案或图片直接编辑 · 拖动图片或按 Alt + ← / → 排序'}</p>
     {view && <Modal title={view.kind === 'live' ? '实况预览' : '图片预览'} onClose={() => setView(null)} wide>
       <div className="lightbox">{view.videoUrl ? <video src={view.videoUrl} poster={view.imageUrl} controls loop autoPlay/> : <img src={view.imageUrl} alt={view.name}/>}</div><div className="modal-footnote">{view.width} × {view.height}{view.kind === 'live' && ` · ${view.duration?.toFixed(2)} 秒实况`}</div>
     </Modal>}

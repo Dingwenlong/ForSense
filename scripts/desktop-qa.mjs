@@ -61,16 +61,9 @@ try {
   const originalCard = () => page.locator(`.library-card[data-draft-id="${originalDraftId}"]`);
   const caption = '把时间留给风，把心情留给海。\n\n走走停停，收集一些简单的快乐。🌊\n#周末日常 #慢生活';
   await page.getByRole('textbox', { name: '发布文案', exact: true }).fill(caption);
-  await page.getByRole('button', { name: '复制文案', exact: true }).click();
-  if (clipboardAvailable) {
-    await page.getByText('文案已复制，可粘贴到发布页面', { exact: true }).waitFor();
-    assert.equal(await application.evaluate(({ clipboard }) => clipboard.readText()), caption);
-  } else {
-    await page.getByRole('alert').filter({ hasText: '系统剪贴板暂不可用' }).waitFor();
-    await dismissNotice();
-  }
+  await waitFor(async () => await page.evaluate(async id => (await window.desktop.listDrafts()).drafts.find(d => d.id === id)?.caption, originalDraftId) === caption);
   await page.screenshot({ path: path.join(output, '03-wechat-caption.png') });
-  record(clipboardAvailable ? 'WeChat caption saves and copies to the OS clipboard' : 'WeChat caption saves; inaccessible OS clipboard reports failure instead of success');
+  record('WeChat caption editing updates the preview and saves the complete text');
 
   await selectFiles(images.slice(0, 3));
   await page.locator('.wechat-proof__add').click();
@@ -175,24 +168,33 @@ try {
   await originalCard().locator('.library-card-open').click();
   record('Caption supplies the draft name; save-as preserves text without naming; search and deletion keep the original intact');
 
+  await page.getByRole('navigation', { name: '工作区导航' }).getByRole('button', { name: '素材库', exact: true }).click();
   await page.getByRole('button', { name: '从视频取材', exact: true }).click();
   await selectFiles([inputVideo]);
   await page.locator('.video-source-label').getByRole('button', { name: '选择视频', exact: true }).click();
   await waitFor(async () => await page.locator('.video-source-label').innerText().then(t => t.includes('短视频.mp4')));
   await page.getByRole('button', { name: '下一帧', exact: true }).click();
-  await page.getByRole('button', { name: '截取并加入草稿', exact: true }).click();
-  await waitFor(async () => (await page.locator('.image-counter').innerText()).endsWith('/5'));
+  await page.getByRole('button', { name: '截取并保存到素材库', exact: true }).click();
+  await page.getByText('素材已保存到素材库', { exact: true }).waitFor();
+  await dismissNotice();
   await page.getByRole('button', { name: '制作实况', exact: true }).click();
   await page.getByRole('checkbox', { name: '保留原声', exact: true }).uncheck();
-  await page.getByRole('button', { name: '制作并加入草稿', exact: true }).click();
+  await page.getByRole('button', { name: '制作并保存到素材库', exact: true }).click();
+  await page.getByText('素材已保存到素材库', { exact: true }).waitFor();
+  await page.getByRole('button', { name: '返回素材库', exact: true }).click();
+  await dismissNotice();
+  assert.equal(await page.evaluate(async id => (await window.desktop.listDrafts()).drafts.find(d => d.id === id).items.length, originalDraftId), 4);
+  await page.getByRole('checkbox', { name: /^选择 短视频\.mp4 · .*秒$/ }).check();
+  await page.getByRole('checkbox', { name: '选择 短视频.mp4 · 实况', exact: true }).check();
+  await page.getByRole('button', { name: '加入当前草稿', exact: true }).click();
+  await page.getByRole('region', { name: '预览工作台', exact: true }).waitFor();
   await waitFor(async () => (await page.locator('.image-counter').innerText()).endsWith('/6'));
-  await page.getByRole('button', { name: '返回图文', exact: true }).click();
   await page.getByRole('switch', { name: '抖音预览', exact: true }).click();
   assert.equal(await photos().count(), 6);
   await page.locator('.wechat-proof__live').click();
   await page.getByRole('dialog', { name: '实况预览' }).waitFor();
   await page.getByRole('button', { name: '关闭窗口', exact: true }).click();
-  record('Video frame and Live Photo still enter the same preview without a sidebar');
+  record('Video tools save frames and Live Photos to the library; selecting them adds ordered assets to the draft');
 
   await page.getByRole('button', { name: '导出素材包', exact: true }).click();
   const exportParent = path.join(work, 'exports'); await mkdir(exportParent);

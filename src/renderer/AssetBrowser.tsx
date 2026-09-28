@@ -31,7 +31,7 @@ export function AssetBrowser({ busy, refreshKey, mode = 'manage', excludeIds = [
   return <div className="asset-browser">
     <div className="controls asset-library-tools">
       <button disabled={busy} onClick={onImport}>从电脑导入图片</button>
-      {mode === 'manage' && <button disabled={busy} onClick={() => onVideo('')}>导入视频</button>}
+      {mode === 'manage' && <button disabled={busy} onClick={() => onVideo('')}>从视频取材</button>}
       <label>搜索素材 <input aria-label="搜索素材" type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="名称或优化提示词"/></label>
       <label>分类 <select aria-label="素材分类" value={filter} onChange={e => setFilter(e.target.value)}>
         <option value="all">全部图片与实况</option><option value="image">图片</option>

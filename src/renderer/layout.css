@@ -51,7 +51,7 @@ img, video { max-width: 100%; }
 .platform-switch > span { display: block; width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 1px solid #999; }
 .platform-switch[aria-checked="true"] > span { transform: translateX(16px); }
 .platform-switch:disabled { opacity: .5; }
-.workbench-toolbar > button:last-child { margin-left: auto; }
+.workbench-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-left: auto; }
 .workbench-preview { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .workbench-preview-scroll { flex: 1; min-height: 0; overflow: auto; padding: 14px; }
 
