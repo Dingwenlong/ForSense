@@ -19,10 +19,10 @@ export function WorkbenchPage({ draft, busy, canSaveAs, change, importFiles, add
     onDrop={event => { if (!event.dataTransfer.files.length) return; event.preventDefault(); handleFiles(event.dataTransfer.files); }}>
     <div className="workbench-toolbar">
       <div className="platform-control" role="group" aria-label="预览平台">
-        <span>预览平台</span><span className={draft.platform === 'moments' ? 'platform-active' : ''}>微信</span>
+        <span>预览平台</span><span>微信</span>
         <button type="button" role="switch" aria-label="抖音预览" aria-checked={draft.platform === 'douyin'} disabled={busy} className="platform-switch"
           onClick={() => change({ platform: draft.platform === 'moments' ? 'douyin' : 'moments' })}><span aria-hidden="true"/></button>
-        <span className={draft.platform === 'douyin' ? 'platform-active' : ''}>抖音</span>
+        <span>抖音</span>
       </div>
       <button disabled={busy} onClick={openVideo}>从视频取材</button>
       <button disabled={!draft.caption} onClick={copy}>复制文案</button>
