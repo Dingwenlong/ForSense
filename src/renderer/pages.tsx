@@ -1,10 +1,11 @@
 import { useRef } from 'react';
 import type { Draft, Platform } from '../shared/types';
+import { MAX_DRAFTS } from '../shared/types';
 
-export function LibraryPage({ drafts, filter, query, busy, setFilter, setQuery, open, remove }: {
+export function LibraryPage({ drafts, filter, query, busy, setFilter, setQuery, open, remove, create }: {
   drafts: Draft[]; filter: 'all' | Platform; query: string; busy: boolean;
   setFilter: (value: 'all' | Platform) => void; setQuery: (value: string) => void;
-  open: (draft: Draft) => void; remove: (draft: Draft) => void;
+  open: (draft: Draft) => void; remove: (draft: Draft) => void; create: () => void;
 }) {
   const search = useRef<HTMLInputElement>(null);
   const keywords = query.trim().toLowerCase().split(/\s+/u).filter(Boolean);
@@ -27,12 +28,15 @@ export function LibraryPage({ drafts, filter, query, busy, setFilter, setQuery, 
       {visible.map(item => <article key={item.id} className="library-card"><button className="library-card-open" disabled={busy} onClick={() => open(item)}>
         {item.items[0] && <img src={item.items[0].imageUrl} alt=""/>}
         <span><strong>{item.title || '未命名草稿'}</strong><br/>
-          最近预览：{item.platform === 'moments' ? '微信' : '抖音'} · {item.items.length} 张素材 ·
+          {item.platform === 'moments' ? '微信' : '抖音'} · {item.items.length} 张素材 ·
           {' '}{new Date(item.updatedAt).toLocaleDateString('zh-CN')}
         </span>
-        <span aria-hidden="true">打开</span>
       </button><button disabled={busy} aria-label={`删除草稿 ${item.title || '未命名草稿'}`} onClick={() => remove(item)}>删除</button></article>)}
-      {!visible.length && <p>{query || filter !== 'all' ? '没有匹配的草稿，试试更换标签或关键词。' : '还没有草稿，点击“新建草稿”开始。'}</p>}
+      <button className="draft-create" aria-label="新建草稿" title={drafts.length >= MAX_DRAFTS ? '草稿已达 10 份上限' : '新建草稿'} disabled={busy || drafts.length >= MAX_DRAFTS} onClick={create}>
+        <svg aria-hidden="true" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 4v16M4 12h16"/></svg>
+      </button>
     </div>
+    {!visible.length && (query || filter !== 'all') && <p>没有匹配的草稿，试试更换标签或关键词。</p>}
+    {drafts.length >= MAX_DRAFTS && <p role="status">已达 {MAX_DRAFTS} 份草稿上限，删除不需要的草稿后可继续新建或另存。</p>}
   </section>;
 }

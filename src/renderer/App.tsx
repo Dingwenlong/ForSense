@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Draft, MediaAsset, VideoSource } from '../shared/types';
+import { MAX_DRAFTS } from '../shared/types';
 import { useJobs, errorText } from './hooks';
 import { Modal } from './Modal';
 import { CropEditor } from './CropEditor';
@@ -111,15 +112,13 @@ export function App() {
     <header className="app-header">
       <strong>片语</strong>
       {page !== 'library' && <button disabled={working} onClick={backToLibrary}>返回草稿列表</button>}
-      {draft && page !== 'workbench' && <button disabled={working} onClick={() => navigate('workbench')}>返回当前草稿</button>}
       <nav className="controls" aria-label="工作区导航">
-        <button aria-pressed={page === 'assets' || page === 'optimization'} disabled={working} onClick={() => navigate('assets')}>全局素材库</button>
-        <button disabled={working} onClick={newDraft}>新建草稿</button>
+        <button aria-pressed={page === 'assets' || page === 'optimization'} disabled={working} onClick={() => navigate('assets')}>素材库</button>
       </nav>
     </header>
     <main ref={pageBody} className="page-body">
-      {loading ? <p role="status">正在加载草稿…</p> : page === 'assets' ? <section className="page-content" aria-label="全局素材库">
-        <h1>全局素材库</h1><p>所有草稿共用一份素材库。原图、截图、实况与手动导入的优化结果都保存在本机。</p>{renderAssets('manage')}
+      {loading ? <p role="status">正在加载草稿…</p> : page === 'assets' ? <section className="page-content" aria-label="素材库">
+        <h1>素材库</h1><p>所有草稿共用一份素材库。原图、截图、实况与手动导入的优化结果都保存在本机。</p>{renderAssets('manage')}
       </section> : page === 'optimization' ? <OptimizationPage session={optimization} setSession={setOptimization} busy={working}
         selectImage={() => setAssetPicker('ai')} importImage={importOptimizationSource} copyImage={copyImage} copyPrompt={copyPrompt}
         canUseResult={!!draft && !!optimization.result && !draft.items.some(i => i.id === optimization.result!.id)}
@@ -130,8 +129,8 @@ export function App() {
           const result = await run<MediaAsset>('optimization', { path: paths[0], sourceId: optimization.source.id, templateId: optimization.templateId, prompt: optimization.prompt });
           setOptimization(previous => ({ ...previous, result })); setNotice({ text: '优化结果已保存到素材库，原图保留' });
         })}/> : page === 'library' || !draft ?
-        <LibraryPage drafts={drafts} filter={filter} query={query} busy={working} setFilter={setFilter} setQuery={setQuery} open={select} remove={setDeleteTarget}/> :
-        <WorkbenchPage draft={draft} busy={working} change={change} importFiles={importFiles} addImages={() => setAssetPicker('draft')}
+        <LibraryPage drafts={drafts} filter={filter} query={query} busy={working} setFilter={setFilter} setQuery={setQuery} open={select} remove={setDeleteTarget} create={newDraft}/> :
+        <WorkbenchPage draft={draft} busy={working} canSaveAs={drafts.length < MAX_DRAFTS} change={change} importFiles={importFiles} addImages={() => setAssetPicker('draft')}
           openVideo={() => setVideoOpen(true)} reorder={reorder} edit={setCropAsset}
           rejectVideoDrop={() => setNotice({ text: '视频请通过“从视频取材”打开', error: true })}
           saveAs={() => { setSaveAsTitle((draft.title.trim() || '未命名草稿').slice(0, 115) + ' 副本'); setSaveAsOpen(true); }}
@@ -159,7 +158,7 @@ export function App() {
       setCropAsset(null);
     })}/>}
     {videoOpen && <VideoTool source={videoSource} setSource={setVideoSource} busy={working} run={run} toLibrary={page !== 'workbench'}
-      perform={action => void perform(action)} add={asset => { if (page === 'workbench') addItems([asset]); setNotice({ text: page === 'workbench' ? '素材已加入当前草稿' : '素材已保存到全局素材库' }); }} close={() => setVideoOpen(false)}/>}
+      perform={action => void perform(action)} add={asset => { if (page === 'workbench') addItems([asset]); setNotice({ text: page === 'workbench' ? '素材已加入当前草稿' : '素材已保存到素材库' }); }} close={() => setVideoOpen(false)}/>}
     {exportOpen && <Modal title={exportResult ? '导出完成' : '导出发布素材包'} onClose={() => setExportOpen(false)} busy={working}>
       {exportResult ? <div className="export-success">
         <h3>素材包已保存</h3><p>图片按顺序编号，文案单独保存。</p>

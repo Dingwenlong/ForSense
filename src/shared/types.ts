@@ -1,4 +1,5 @@
 export type Platform = 'moments' | 'douyin';
+export const MAX_DRAFTS = 10;
 export interface Crop { x: number; y: number; width: number; height: number }
 export interface Edits { rotation: 0 | 90 | 180 | 270; crop?: Crop }
 export interface MediaAsset {

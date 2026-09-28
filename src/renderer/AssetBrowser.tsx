@@ -78,7 +78,7 @@ export function AssetBrowser({ busy, refreshKey, mode = 'manage', excludeIds = [
         {mode === 'manage' && <button disabled={busy} onClick={() => update(detail.id, { archived: !detail.archived })}>{detail.archived ? '恢复到素材库' : '归档素材'}</button>}
       </div>
       {mode === 'manage' && <p>归档仅在素材库中隐藏；草稿中的图片和原文件保留，可从“已归档”恢复。</p>}
-      {detail.optimization && <p>此图由你手动导入为优化结果，已保存对应原图与提示词，可在全局素材库的素材详情中进入 AI 图片优化查看对比。</p>}
+      {detail.optimization && <p>此图由你手动导入为优化结果，已保存对应原图与提示词，可在素材库的素材详情中进入 AI 图片优化查看对比。</p>}
     </section>}
     {onUse && mode !== 'ai' && <footer className="asset-picker-footer controls">
       <span>已选 {eligible.length} 张</span><button disabled={busy || !eligible.length} onClick={() => { onUse(eligible); setSelected([]); }}>加入当前草稿</button>

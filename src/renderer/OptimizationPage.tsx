@@ -40,7 +40,7 @@ export function OptimizationPage({ session, setSession, busy, selectImage, impor
       </nav>
       {session.step === 1 && <section className="optimization-source">
         <h2>选择要优化的原图</h2>
-        <p>支持 JPG、PNG、WebP。导入的图片同时保存在全局素材库。</p>
+        <p>支持 JPG、PNG、WebP。导入的图片同时保存在素材库。</p>
         <div className="controls"><button disabled={busy} onClick={selectImage}>从素材库选择</button><button disabled={busy} onClick={importImage}>导入一张原图</button></div>
         {session.source && <figure><img src={session.source.imageUrl} alt="当前优化原图"/><figcaption>{session.source.name}</figcaption><button disabled={busy} onClick={() => setSession({ ...session, step: 2 })}>下一步：选择模板</button></figure>}
       </section>}

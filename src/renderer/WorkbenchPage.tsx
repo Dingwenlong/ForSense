@@ -1,8 +1,8 @@
 import type { Draft, MediaAsset } from '../shared/types';
 import { Preview } from './Preview';
 
-export function WorkbenchPage({ draft, busy, change, importFiles, addImages, openVideo, reorder, edit, saveAs, rejectVideoDrop, copy, exportPackage }: {
-  draft: Draft; busy: boolean; change: (patch: Partial<Draft>) => void;
+export function WorkbenchPage({ draft, busy, canSaveAs, change, importFiles, addImages, openVideo, reorder, edit, saveAs, rejectVideoDrop, copy, exportPackage }: {
+  draft: Draft; busy: boolean; canSaveAs: boolean; change: (patch: Partial<Draft>) => void;
   importFiles: (paths?: string[]) => void; addImages: () => void; openVideo: () => void; reorder: (from: number, to: number) => void;
   edit: (asset: MediaAsset) => void; saveAs: () => void;
   rejectVideoDrop: () => void; copy: () => void; exportPackage: () => void;
@@ -31,7 +31,7 @@ export function WorkbenchPage({ draft, busy, change, importFiles, addImages, ope
       </div>
       <button disabled={busy} onClick={openVideo}>从视频取材</button>
       <button disabled={!draft.caption} onClick={copy}>复制文案</button>
-      <button disabled={busy} onClick={saveAs}>另存草稿</button>
+      <button disabled={busy || !canSaveAs} title={canSaveAs ? undefined : '草稿已达 10 份上限，请先在列表删除不需要的草稿'} onClick={saveAs}>另存草稿</button>
       <button disabled={busy || (!draft.items.length && !draft.caption.trim())} onClick={exportPackage}>导出素材包</button>
     </div>
     <div className="workbench-preview" aria-label="实时预览">

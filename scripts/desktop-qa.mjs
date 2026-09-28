@@ -1,14 +1,14 @@
 import { _electron as electron } from 'playwright';
-import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
-import os from 'node:os';
 import assert from 'node:assert/strict';
 
 const root = path.resolve(import.meta.dirname, '..');
 const executable = process.env.SOCIAL_COPY_QA_EXECUTABLE || path.join(root, 'out/SocialCopyStudio-win32-x64/SocialCopyStudio.exe');
-const work = await mkdtemp(path.join(os.tmpdir(), 'social-copy-desktop-qa-'));
 const output = path.join(root, 'output/playwright'); await mkdir(output, { recursive: true });
+const dataRoot = path.join(root, 'output/test-data'); await mkdir(dataRoot, { recursive: true });
+const work = await mkdtemp(path.join(dataRoot, 'desktop-'));
 const ffmpeg = path.join(root, 'resources/media/ffmpeg.exe');
 const assertions = [], errors = [];
 let application, page, clipboardAvailable = false;
@@ -75,13 +75,15 @@ try {
   await page.locator('.wechat-proof__add').click();
   await page.getByRole('dialog', { name: '添加图片', exact: true }).getByRole('button', { name: '从电脑导入图片', exact: true }).click();
   await waitFor(async () => await photos().count() === 3);
+  await page.getByRole('dialog', { name: '添加图片', exact: true }).waitFor({ state: 'hidden' });
+  await waitFor(async () => await photos().first().isEnabled());
   assert.equal(await page.locator('.wechat-proof__add').count(), 1);
   const first = await photos().first().locator('img').getAttribute('src');
   await photos().first().dragTo(photos().nth(2));
-  assert.equal(await photos().nth(2).locator('img').getAttribute('src'), first);
+  await waitFor(async () => await photos().nth(2).locator('img').getAttribute('src') === first);
   await photos().nth(2).focus();
   await page.keyboard.press('Alt+ArrowLeft');
-  assert.equal(await photos().nth(1).locator('img').getAttribute('src'), first);
+  await waitFor(async () => await photos().nth(1).locator('img').getAttribute('src') === first);
   await photos().first().click();
   await page.getByRole('dialog', { name: '调整画面' }).waitFor();
   await page.getByRole('button', { name: '1:1', exact: true }).click();
@@ -163,7 +165,7 @@ try {
   await page.getByRole('dialog', { name: '删除这份草稿？' }).waitFor({ state: 'hidden' });
   await page.getByRole('heading', { name: '我的草稿', exact: true }).waitFor();
   assert.equal(await page.locator('.library-card').count(), 1);
-  await page.getByRole('button', { name: '返回当前草稿', exact: true }).click();
+  await page.locator('.library-card').filter({ hasText: '海边的慢日子' }).locator('.library-card-open').click();
   record('Save as preserves the original; platform tags combine with keywords; deletion works from the list');
 
   await page.getByRole('button', { name: '从视频取材', exact: true }).click();
@@ -235,14 +237,14 @@ try {
 
   await page.getByRole('button', { name: '关闭窗口', exact: true }).click();
   await dismissNotice();
-  await page.getByRole('navigation', { name: '工作区导航' }).getByRole('button', { name: '全局素材库', exact: true }).click();
-  await page.getByRole('heading', { name: '全局素材库', exact: true }).waitFor();
+  await page.getByRole('navigation', { name: '工作区导航' }).getByRole('button', { name: '素材库', exact: true }).click();
+  await page.getByRole('heading', { name: '素材库', exact: true }).waitFor();
   await waitFor(async () => await page.locator('.material-card').count() >= 7);
   await page.getByRole('combobox', { name: '素材分类', exact: true }).selectOption('video');
   await page.getByRole('button', { name: '打开视频取材', exact: true }).click();
   await page.locator('.video-source-label').filter({ hasText: '短视频.mp4' }).waitFor();
   await page.getByRole('button', { name: '截取并保存到素材库', exact: true }).click();
-  await page.getByText('素材已保存到全局素材库', { exact: true }).waitFor();
+  await page.getByText('素材已保存到素材库', { exact: true }).waitFor();
   await page.getByRole('button', { name: '返回素材库', exact: true }).click();
   await dismissNotice();
   record('Global library includes existing images, Live Photos and reusable imported videos');
@@ -331,13 +333,42 @@ try {
   await picker.getByRole('button', { name: '关闭窗口', exact: true }).click();
   await application.close(); application = null;
   await launch();
-  await page.getByRole('navigation', { name: '工作区导航' }).getByRole('button', { name: '全局素材库', exact: true }).click();
+  await page.getByRole('navigation', { name: '工作区导航' }).getByRole('button', { name: '素材库', exact: true }).click();
   await page.getByRole('combobox', { name: '素材分类', exact: true }).selectOption('ai');
   await page.getByRole('button', { name: '查看素材 product-after.png', exact: true }).click();
   await page.getByRole('region', { name: '素材详情', exact: true }).getByRole('button', { name: 'AI 图片优化', exact: true }).click();
   assert.equal(await page.getByRole('textbox', { name: '优化提示词', exact: true }).inputValue(), prompt + '\n自定义：保留完整杯柄。');
   assert.equal(await page.locator('.optimization-result img').count(), 2);
   record('Preview + reuses library assets without duplicates; comparison and prompt survive restart');
+
+  await page.getByRole('button', { name: '返回草稿列表', exact: true }).click();
+  while (await page.locator('.library-card').count() < 10) {
+    await page.getByRole('button', { name: '新建草稿', exact: true }).click();
+    await page.getByRole('heading', { name: '实时预览', exact: true }).waitFor();
+    await page.getByRole('button', { name: '返回草稿列表', exact: true }).click();
+    await page.getByRole('heading', { name: '我的草稿', exact: true }).waitFor();
+  }
+  assert.equal(await page.getByRole('button', { name: '新建草稿', exact: true }).isDisabled(), true);
+  await page.getByRole('textbox', { name: '搜索草稿', exact: true }).fill('不匹配的筛选');
+  assert.equal(await page.locator('.library-card').count(), 0);
+  assert.equal(await page.getByRole('button', { name: '新建草稿', exact: true }).isDisabled(), true);
+  await page.getByRole('button', { name: '清空搜索', exact: true }).click();
+  const capacity = await page.evaluate(async () => {
+    const { drafts } = await window.desktop.listDrafts();
+    const results = await Promise.allSettled([window.desktop.createDraft('moments'), window.desktop.saveDraftAs(drafts[0].id, '超出上限')]);
+    return { rejected: results.every(result => result.status === 'rejected'), count: (await window.desktop.listDrafts()).drafts.length };
+  });
+  assert.deepEqual(capacity, { rejected: true, count: 10 });
+  await page.screenshot({ path: path.join(output, '13-draft-limit.png') });
+  await page.locator('.library-card').first().locator('.library-card-open').click();
+  assert.equal(await page.getByRole('button', { name: '另存草稿', exact: true }).isDisabled(), true);
+  await page.getByRole('button', { name: '返回草稿列表', exact: true }).click();
+  await page.locator('.library-card').first().getByRole('button', { name: /^删除草稿 / }).click();
+  await page.getByRole('dialog', { name: '删除这份草稿？' }).getByRole('button', { name: '删除草稿', exact: true }).click();
+  await page.getByRole('dialog', { name: '删除这份草稿？' }).waitFor({ state: 'hidden' });
+  assert.equal(await page.locator('.library-card').count(), 9);
+  assert.equal(await page.getByRole('button', { name: '新建草稿', exact: true }).isEnabled(), true);
+  record('Ten-draft limit covers filtered lists, new drafts and save-as; deleting a draft restores availability');
 
   const boundary = await page.evaluate(async () => {
     try { await window.desktop.startJob(crypto.randomUUID(), 'export', { directory: 'C:/', draftId: crypto.randomUUID(), format: 'folder', targets: [] }); return false; }
@@ -351,5 +382,5 @@ try {
   throw error;
 } finally {
   if (application) await application.close().catch(() => {});
-  await rm(work, { recursive: true, force: true, maxRetries: 4, retryDelay: 250 });
+  console.log('Test materials retained:', path.relative(root, work));
 }

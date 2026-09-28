@@ -3,6 +3,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { Draft, Edits, MediaAsset, Platform, VideoSource, LibrarySnapshot } from '../shared/types';
+import { MAX_DRAFTS } from '../shared/types';
 import { atomicJSON, inside } from './io';
 
 export const uuid = z.string().uuid();
@@ -20,6 +21,7 @@ export interface SourceRecord { id: string; name: string; videoFile: string; dur
 
 export class Store {
   private writes = new Map<string, Promise<unknown>>();
+  private additions: Promise<unknown> = Promise.resolve();
   constructor(readonly root: string) {}
   async init() { for (const name of ['drafts', 'assets', 'sources', 'temporary']) await fs.mkdir(inside(this.root, name), { recursive: true }); }
   directory(type: 'assets' | 'sources', id: string) { return inside(this.root, type, uuid.parse(id)); }
@@ -104,7 +106,17 @@ export class Store {
   async create(platform: Platform): Promise<Draft> {
     const now = new Date().toISOString();
     const draft: Draft = { version: 1, id: randomUUID(), title: '未命名草稿', platform: z.enum(['moments', 'douyin']).parse(platform), caption: '', items: [], createdAt: now, updatedAt: now };
-    await atomicJSON(this.draftFile(draft.id), draft); return draft;
+    return this.addDraft(draft);
+  }
+  private async addDraft(draft: Draft): Promise<Draft> {
+    const addition = this.additions.catch(() => {}).then(async () => {
+      const files = await fs.readdir(inside(this.root, 'drafts'));
+      const count = files.filter(file => file.endsWith('.json') && uuid.safeParse(file.slice(0, -5)).success).length;
+      if (count >= MAX_DRAFTS) throw new Error(`最多保留 ${MAX_DRAFTS} 份草稿，请先在草稿列表删除不需要的草稿`);
+      await atomicJSON(this.draftFile(draft.id), draft); return draft;
+    });
+    this.additions = addition;
+    return addition;
   }
   async save(input: unknown): Promise<Draft> {
     const data = draftInput.parse(input);
@@ -124,7 +136,7 @@ export class Store {
     await this.writes.get(id);
     const original = await this.load(id), now = new Date().toISOString();
     const draft = { ...original, id: randomUUID(), title: name ?? (original.title.slice(0, 115) + ' 副本'), createdAt: now, updatedAt: now };
-    await atomicJSON(this.draftFile(draft.id), draft); return draft;
+    return this.addDraft(draft);
   }
   async remove(id: string) { await this.writes.get(id); await fs.unlink(this.draftFile(id)); }
 }
