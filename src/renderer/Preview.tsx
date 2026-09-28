@@ -4,17 +4,18 @@ import { Modal } from './Modal';
 import { DouyinPreview } from './DouyinPreview';
 import { WechatPreview } from './WechatPreview';
 
-export function Preview({ draft, busy, onEdit, onReorder, onAddImages, onCaptionChange }: { draft: Draft; busy: boolean; onEdit: (asset: MediaAsset) => void; onReorder: (from: number, to: number) => void; onAddImages: () => void; onCaptionChange: (caption: string) => void }) {
+export function Preview({ draft, busy, editing, onEdit, onRemove, onReorder, onAddImages, onCaptionChange }: { draft: Draft; busy: boolean; editing: boolean; onEdit: (asset: MediaAsset) => void; onRemove: (id: string) => void; onReorder: (from: number, to: number) => void; onAddImages: () => void; onCaptionChange: (caption: string) => void }) {
   const [index, setIndex] = useState(0), [view, setView] = useState<MediaAsset | null>(null), [playing, setPlaying] = useState(false);
   useEffect(() => { setIndex(0); setPlaying(false); }, [draft.id, draft.platform]);
   const safeIndex = Math.min(index, Math.max(0, draft.items.length - 1));
   const current = draft.items[safeIndex];
   useEffect(() => { setPlaying(false); }, [current?.id]);
+  useEffect(() => { setPlaying(false); }, [editing]);
   function next(n: number) { setIndex(Math.max(0, Math.min(draft.items.length - 1, safeIndex + n))); }
   return <>
     <div className="layout-sheet" aria-label="图文排版预览">
-      {draft.platform === 'moments' ? <WechatPreview draft={draft} busy={busy} onEdit={onEdit} onReorder={onReorder} onPlay={setView} onAddImages={onAddImages} onCaptionChange={onCaptionChange}/>
-        : <DouyinPreview draft={draft} busy={busy} current={current} index={safeIndex} playing={playing} setPlaying={setPlaying} onEdit={onEdit} onAddImages={onAddImages} onCaptionChange={onCaptionChange}
+      {draft.platform === 'moments' ? <WechatPreview draft={draft} busy={busy} editing={editing} onRemove={onRemove} onEdit={onEdit} onReorder={onReorder} onPlay={setView} onAddImages={onAddImages} onCaptionChange={onCaptionChange}/>
+        : <DouyinPreview draft={draft} busy={busy} editing={editing} onRemove={onRemove} current={current} index={safeIndex} playing={playing} setPlaying={setPlaying} onEdit={onEdit} onAddImages={onAddImages} onCaptionChange={onCaptionChange}
             onReorder={(from, to) => { onReorder(from, to); setIndex(to); }} next={next}/>}
     </div>
     {view && <Modal title={view.kind === 'live' ? '实况预览' : '图片预览'} onClose={() => setView(null)} wide>

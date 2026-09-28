@@ -143,8 +143,8 @@ export function App() {
           setOptimization(previous => ({ ...previous, result })); setNotice({ text: '优化结果已保存到素材库，原图保留' });
         })}/> : page === 'library' || !draft ?
         <LibraryPage drafts={drafts} filter={filter} query={query} busy={working} setFilter={setFilter} setQuery={setQuery} open={select} remove={setDeleteTarget} create={newDraft}/> :
-        <WorkbenchPage draft={draft} busy={working} canSaveAs={drafts.length < MAX_DRAFTS} change={change} importFiles={importFiles} addImages={() => setAssetPicker('draft')} back={goBack}
-          reorder={reorder} edit={setCropAsset}
+        <WorkbenchPage key={draft.id} draft={draft} busy={working} canSaveAs={drafts.length < MAX_DRAFTS} change={change} importFiles={importFiles} addImages={() => setAssetPicker('draft')} back={goBack}
+          reorder={reorder} edit={setCropAsset} remove={id => { const current = draftRef.current; if (current) change({ items: current.items.filter(item => item.id !== id) }); }}
           rejectVideoDrop={() => setNotice({ text: '请到素材库使用“从视频取材”', error: true })}
           saveAs={() => void perform(async () => {
             await flush(); const current = draftRef.current; if (!current) return;
@@ -165,10 +165,7 @@ export function App() {
       <p>{job.message}</p><button onClick={() => void cancel()}>取消任务</button>
     </div>}
     {assetPicker && <Modal title={assetPicker === 'ai' ? '选择优化原图' : '添加图片'} onClose={() => setAssetPicker(null)} busy={working} wide>{renderAssets(assetPicker === 'ai' ? 'ai' : 'pick')}</Modal>}
-    {cropAsset && <CropEditor asset={cropAsset} busy={working} close={() => setCropAsset(null)} remove={() => {
-      const current = draftRef.current; if (current) change({ items: current.items.filter(item => item.id !== cropAsset.id) });
-      setCropAsset(null);
-    }} save={edits => void perform(async () => {
+    {cropAsset && <CropEditor asset={cropAsset} busy={working} close={() => setCropAsset(null)} save={edits => void perform(async () => {
       const item = await run<MediaAsset>('edit', { id: cropAsset.id, edits });
       const current = draftRef.current; if (current) change({ items: current.items.map(i => i.id === cropAsset.id ? item : i) });
       setCropAsset(null);

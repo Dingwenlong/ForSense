@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Draft, MediaAsset } from '../shared/types';
 import { acceptsPreviewDrag, beginPreviewDrag, previewDragSource } from './previewDrag';
 
@@ -13,8 +13,8 @@ function Glyph({ kind }: { kind: 'search' | 'heart' | 'comment' | 'star' | 'shar
   </svg>;
 }
 
-export function DouyinPreview({ draft, busy, current, index, playing, setPlaying, onEdit, onReorder, onAddImages, onCaptionChange, next }: {
-  draft: Draft; busy: boolean; current: MediaAsset | undefined; index: number; playing: boolean;
+export function DouyinPreview({ draft, busy, editing, onRemove, current, index, playing, setPlaying, onEdit, onReorder, onAddImages, onCaptionChange, next }: {
+  draft: Draft; busy: boolean; editing: boolean; onRemove: (id: string) => void; current: MediaAsset | undefined; index: number; playing: boolean;
   setPlaying: (value: boolean) => void; onEdit: (asset: MediaAsset) => void;
   onReorder: (from: number, to: number) => void; onAddImages: () => void;
   onCaptionChange: (caption: string) => void; next: (direction: number) => void;
@@ -22,6 +22,7 @@ export function DouyinPreview({ draft, busy, current, index, playing, setPlaying
   const [dropIndex, setDropIndex] = useState<number | null>(null);
   const [editingCaption, setEditingCaption] = useState(false);
   const suppressClick = useRef(false);
+  useEffect(() => { setDropIndex(null); suppressClick.current = false; }, [editing]);
   const captionRef = useRef<HTMLTextAreaElement>(null);
   const tags = [...new Set([...draft.caption.matchAll(/#[^\s#]+/gu)].map(match => match[0]))];
   const captionParts = draft.caption.split(/(#[^\s#]+)/gu);
@@ -42,13 +43,13 @@ export function DouyinPreview({ draft, busy, current, index, playing, setPlaying
       <Glyph kind="search"/>
     </div>
     <div className="douyin-proof__media" tabIndex={current ? 0 : -1} role="group" aria-label="图文图片，可使用左右方向键翻页"
-      onDragOver={event => { if (busy || !acceptsPreviewDrag(event)) return; event.preventDefault(); event.dataTransfer.dropEffect = 'move'; const rect = event.currentTarget.getBoundingClientRect(); setDropIndex(targetOnStage(event.clientX, rect.left, rect.width)); }}
+      onDragOver={event => { if (busy || !editing || !acceptsPreviewDrag(event)) return; event.preventDefault(); event.dataTransfer.dropEffect = 'move'; const rect = event.currentTarget.getBoundingClientRect(); setDropIndex(targetOnStage(event.clientX, rect.left, rect.width)); }}
       onDragLeave={() => setDropIndex(null)}
-      onDrop={event => { if (busy) return; const from = previewDragSource(event, draft); if (from < 0) return; event.preventDefault(); event.stopPropagation(); const rect = event.currentTarget.getBoundingClientRect(); const to = targetOnStage(event.clientX, rect.left, rect.width); setDropIndex(null); if (from !== to) onReorder(from, to); }}
+      onDrop={event => { if (busy || !editing) return; const from = previewDragSource(event, draft); if (from < 0) return; event.preventDefault(); event.stopPropagation(); const rect = event.currentTarget.getBoundingClientRect(); const to = targetOnStage(event.clientX, rect.left, rect.width); setDropIndex(null); if (from !== to) onReorder(from, to); }}
       onKeyDown={event => {
         if (draft.items.length < 2) return;
         if (event.altKey && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
-          event.preventDefault(); const to = Math.max(0, Math.min(draft.items.length - 1, index + (event.key === 'ArrowLeft' ? -1 : 1)));
+          event.preventDefault(); if (busy || !editing) return; const to = Math.max(0, Math.min(draft.items.length - 1, index + (event.key === 'ArrowLeft' ? -1 : 1)));
           if (to !== index) onReorder(index, to);
           return;
         }
@@ -56,13 +57,17 @@ export function DouyinPreview({ draft, busy, current, index, playing, setPlaying
         if (event.key === 'ArrowRight') { event.preventDefault(); next(1); }
       }}>
       {current ? <>
+        <div className="douyin-proof__image-wrap">
         {playing && current.videoUrl ? <video src={current.videoUrl} autoPlay loop controls playsInline aria-label={current.name}/>
-          : <button className="douyin-proof__image" aria-label={`编辑 ${current.name}`} draggable={!busy} disabled={busy}
+          : <button className="douyin-proof__image" aria-label={`编辑 ${current.name}`} draggable={editing && !busy} disabled={busy}
               onClick={() => { if (!suppressClick.current) onEdit(current); }}
-              onDragStart={event => { suppressClick.current = true; beginPreviewDrag(event, current.id); }}
+              onDragStart={event => { if (busy || !editing) { event.preventDefault(); return; } suppressClick.current = true; beginPreviewDrag(event, current.id); }}
               onDragEnd={() => { setDropIndex(null); window.setTimeout(() => { suppressClick.current = false; }, 0); }}>
               <img src={current.imageUrl} alt={current.name} draggable={false}/>
             </button>}
+          {editing && <button className="preview-remove" disabled={busy} aria-label={`移除第 ${index + 1} 张图片`} title="从草稿移除" draggable={false}
+            onClick={event => { event.stopPropagation(); onRemove(current.id); }}>×</button>}
+        </div>
         <span className="image-counter douyin-proof__counter">{index + 1}/{draft.items.length}</span>
         {draft.items.length > 1 && <>
           <button className="douyin-proof__previous" aria-label="上一张" onClick={() => next(-1)} disabled={index === 0}>‹</button>
@@ -71,8 +76,8 @@ export function DouyinPreview({ draft, busy, current, index, playing, setPlaying
         {current.kind === 'live' && <button className="douyin-proof__motion" onClick={() => setPlaying(!playing)}>{playing ? '暂停实况' : '播放实况'}</button>}
         <button className="douyin-proof__add" aria-label="添加图片" onClick={onAddImages} disabled={busy}>＋</button>
         <div className="douyin-proof__segments" aria-label={`第 ${index + 1} 张，共 ${draft.items.length} 张`}
-          onDragOver={event => { if (busy || !acceptsPreviewDrag(event)) return; event.preventDefault(); event.stopPropagation(); event.dataTransfer.dropEffect = 'move'; const rect = event.currentTarget.getBoundingClientRect(); setDropIndex(targetOnBar(event.clientX, rect.left, rect.width)); }}
-          onDrop={event => { if (busy) return; const from = previewDragSource(event, draft); if (from < 0) return; event.preventDefault(); event.stopPropagation(); const rect = event.currentTarget.getBoundingClientRect(); const to = targetOnBar(event.clientX, rect.left, rect.width); setDropIndex(null); if (from !== to) onReorder(from, to); }}>
+          onDragOver={event => { if (busy || !editing || !acceptsPreviewDrag(event)) return; event.preventDefault(); event.stopPropagation(); event.dataTransfer.dropEffect = 'move'; const rect = event.currentTarget.getBoundingClientRect(); setDropIndex(targetOnBar(event.clientX, rect.left, rect.width)); }}
+          onDrop={event => { if (busy || !editing) return; const from = previewDragSource(event, draft); if (from < 0) return; event.preventDefault(); event.stopPropagation(); const rect = event.currentTarget.getBoundingClientRect(); const to = targetOnBar(event.clientX, rect.left, rect.width); setDropIndex(null); if (from !== to) onReorder(from, to); }}>
           {draft.items.length <= 18 ? draft.items.map((item, position) => <span key={item.id} className={`${position <= index ? 'seen' : ''} ${position === dropIndex ? 'drop-target' : ''}`}/> )
             : <progress max={draft.items.length} value={index + 1}/>}
         </div>

@@ -86,6 +86,14 @@ try {
   await page.getByRole('dialog', { name: '添加图片', exact: true }).waitFor({ state: 'hidden' });
   await waitFor(async () => await photos().first().isEnabled());
   assert.equal(await page.locator('.wechat-proof__add').count(), 1);
+  assert.equal(await page.locator('.preview-remove').count(), 0);
+  assert.equal(await photos().first().getAttribute('draggable'), 'false');
+  const readonlyOrder = await photos().locator('img').evaluateAll(images => images.map(image => image.src));
+  await photos().nth(2).focus();
+  await page.keyboard.press('Alt+ArrowLeft');
+  assert.deepEqual(await photos().locator('img').evaluateAll(images => images.map(image => image.src)), readonlyOrder);
+  await page.getByRole('button', { name: '编辑模式', exact: true }).click();
+  assert.equal(await page.locator('.preview-remove').count(), 3);
   const first = await photos().first().locator('img').getAttribute('src');
   await photos().first().dragTo(photos().nth(2));
   await waitFor(async () => await photos().nth(2).locator('img').getAttribute('src') === first);
@@ -94,12 +102,16 @@ try {
   await waitFor(async () => await photos().nth(1).locator('img').getAttribute('src') === first);
   await photos().first().click();
   await page.getByRole('dialog', { name: '调整画面' }).waitFor();
+  assert.equal(await page.getByRole('dialog', { name: '调整画面' }).getByRole('button', { name: /^(取消|移除图片|关闭)$/ }).count(), 0);
   await page.getByRole('button', { name: '1:1', exact: true }).click();
   await page.screenshot({ path: path.join(output, '04-image-editor.png') });
   await page.getByRole('button', { name: '应用调整', exact: true }).click();
   await page.getByRole('dialog', { name: '调整画面' }).waitFor({ state: 'hidden' });
   await page.screenshot({ path: path.join(output, '05-wechat-preview.png') });
-  record('WeChat placeholder adds images; drag, keyboard reorder and click-to-edit remain usable');
+  await page.getByRole('button', { name: '完成编辑', exact: true }).click();
+  assert.equal(await page.locator('.preview-remove').count(), 0);
+  assert.equal(await photos().first().getAttribute('draggable'), 'false');
+  record('WeChat removal and sorting require edit mode; crop dialog retains only back and apply actions');
 
   await page.getByRole('switch', { name: '抖音预览', exact: true }).click();
   assert.equal(await page.locator('.douyin-proof').count(), 1);
@@ -117,6 +129,7 @@ try {
   await waitFor(async () => await page.locator('.image-counter').innerText() === '1/4');
   await page.getByRole('button', { name: '下一张', exact: true }).click();
   const movingImage = await page.locator('.douyin-proof__image img').getAttribute('src');
+  await page.getByRole('button', { name: '编辑模式', exact: true }).click();
   const bar = await page.locator('.douyin-proof__segments').boundingBox();
   await page.locator('.douyin-proof__image').dragTo(page.locator('.douyin-proof__segments'), { targetPosition: { x: bar.width * .86, y: bar.height / 2 } });
   assert.equal(await page.locator('.image-counter').innerText(), '4/4');
@@ -125,6 +138,16 @@ try {
   await page.getByRole('dialog', { name: '调整画面' }).waitFor();
   await page.getByRole('dialog', { name: '调整画面' }).getByRole('button', { name: '返回上一层', exact: true }).click();
   await page.screenshot({ path: path.join(output, '06-douyin-preview.png') });
+  await page.getByRole('button', { name: '完成编辑', exact: true }).click();
+  assert.equal(await page.locator('.preview-remove').count(), 0);
+  assert.equal(await page.locator('.douyin-proof__image').getAttribute('draggable'), 'false');
+  await page.locator('.douyin-proof__media').focus();
+  await page.keyboard.press('Alt+ArrowLeft');
+  assert.equal(await page.locator('.image-counter').innerText(), '4/4');
+  assert.equal(await page.locator('.douyin-proof__image img').getAttribute('src'), movingImage);
+  await page.keyboard.press('ArrowLeft');
+  assert.equal(await page.locator('.image-counter').innerText(), '3/4');
+  await page.getByRole('button', { name: '下一张', exact: true }).click();
   record('Douyin placeholder adds a fourth image and inline caption editing updates topics');
 
   await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1080, 720));
@@ -138,18 +161,34 @@ try {
   await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1440, 930));
   record('Preview controls and export remain accessible in the minimum desktop window');
 
+  await page.getByRole('button', { name: '编辑模式', exact: true }).click();
   await page.getByRole('button', { name: '另存草稿', exact: true }).click();
   await page.getByText('已另存为新草稿，原草稿保留', { exact: true }).waitFor();
   const copies = await page.evaluate(() => window.desktop.listDrafts());
   assert.equal(copies.drafts.length, 2);
   assert.ok(copies.drafts.every(d => d.caption === douyinCaption && !('title' in d)));
+  assert.equal(await page.locator('.preview-remove').count(), 0);
   await dismissNotice();
   await page.getByRole('button', { name: '编辑发布文案', exact: true }).click();
   await page.getByRole('textbox', { name: '发布文案', exact: true }).fill('副本文案：' + douyinCaption);
   await page.locator('.douyin-proof__header').click();
-  await page.locator('.douyin-proof__image').click();
-  await page.getByRole('dialog', { name: '调整画面' }).getByRole('button', { name: '移除图片', exact: true }).click();
-  await waitFor(async () => (await page.locator('.image-counter').innerText()).endsWith('/3'));
+  await page.getByRole('button', { name: '编辑模式', exact: true }).click();
+  await page.getByRole('switch', { name: '抖音预览', exact: true }).click();
+  const removedId = (await photos().last().locator('img').getAttribute('src')).split('/')[3];
+  await page.getByRole('button', { name: '移除第 4 张图片', exact: true }).click();
+  await waitFor(async () => await photos().count() === 3);
+  assert.equal(await page.getByRole('dialog', { name: '调整画面' }).count(), 0);
+  assert.equal(await page.evaluate(async id => (await window.desktop.getAsset(id)).id, removedId), removedId);
+  await page.getByRole('switch', { name: '抖音预览', exact: true }).click();
+  await page.locator('.douyin-proof__image-wrap .preview-remove').click();
+  await waitFor(async () => (await page.locator('.image-counter').innerText()).endsWith('/2'));
+  assert.equal(await page.getByRole('dialog', { name: '调整画面' }).count(), 0);
+  await page.locator('.douyin-proof__image-wrap .preview-remove').click();
+  await waitFor(async () => await page.locator('.image-counter').innerText() === '1/1');
+  await page.locator('.douyin-proof__image-wrap .preview-remove').click();
+  await page.locator('.douyin-proof__add-empty').waitFor();
+  assert.equal(await page.locator('.preview-remove').count(), 0);
+  record('Both preview delete buttons remove only the selected draft item; save-as starts outside edit mode');
   await page.getByRole('button', { name: '返回上一层', exact: true }).click();
   await page.getByRole('heading', { name: '我的草稿', exact: true }).waitFor();
   assert.equal(await page.locator('.library-card').count(), 2);
@@ -398,6 +437,26 @@ try {
   assert.equal(await page.locator('.library-card').count(), 9);
   assert.equal(await page.getByRole('button', { name: '新建草稿', exact: true }).isEnabled(), true);
   record('Ten-draft limit covers filtered lists, new drafts and save-as; deleting a draft restores availability');
+
+  await page.getByRole('button', { name: '新建草稿', exact: true }).click();
+  await selectFiles(Array.from({ length: 10 }, (_, index) => images[index % images.length]));
+  await page.locator('.wechat-proof__add').click();
+  await page.getByRole('dialog', { name: '添加图片', exact: true }).getByRole('button', { name: '从电脑导入图片', exact: true }).click();
+  await page.getByRole('dialog', { name: '添加图片', exact: true }).waitFor({ state: 'hidden' });
+  assert.equal(await photos().count(), 9);
+  await page.getByRole('button', { name: '编辑模式', exact: true }).click();
+  assert.equal(await photos().count(), 10);
+  assert.equal(await page.locator('.preview-remove').count(), 10);
+  await page.screenshot({ path: path.join(output, '14-edit-all-images.png') });
+  await page.getByRole('button', { name: '移除第 10 张图片', exact: true }).click();
+  await waitFor(async () => await photos().count() === 9);
+  for (let remaining = 8; remaining >= 0; remaining--) {
+    await page.getByRole('button', { name: '移除第 1 张图片', exact: true }).click();
+    await waitFor(async () => await photos().count() === remaining);
+  }
+  await page.locator('.wechat-proof__add').waitFor();
+  await page.getByRole('button', { name: '完成编辑', exact: true }).click();
+  record('WeChat edit mode exposes images beyond nine and safely removes the final image');
 
   const boundary = await page.evaluate(async () => {
     try { await window.desktop.startJob(crypto.randomUUID(), 'export', { directory: 'C:/', draftId: crypto.randomUUID(), format: 'folder', targets: [] }); return false; }
