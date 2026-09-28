@@ -86,7 +86,7 @@ export function App() {
       const original = await window.desktop.getAsset(asset.optimization.sourceId);
       setOptimization({ source: original, result: asset, templateId: asset.optimization.templateId, prompt: asset.optimization.prompt, step: 3 });
     } else setOptimization(previous => ({ ...previous, source: asset, result: null, step: 2 }));
-    setCropAsset(null); setAssetPicker(null); setPage('optimization');
+    setAssetPicker(null); setPage('optimization');
   });
   const importToLibrary = () => void perform(async () => {
     const paths = await window.desktop.pickImages(); if (!paths.length) return;
@@ -109,15 +109,14 @@ export function App() {
       const items = await run<MediaAsset[]>('images', paths); addItems(items); setAssetPicker(null);
     }) : importToLibrary}
     onUse={mode === 'ai' ? items => { setOptimization(previous => ({ ...previous, source: items[0], result: null, step: 2 })); setAssetPicker(null); } : draft ? selectLibraryItems : undefined}
-    onOptimize={openOptimization} onVideo={openLibraryVideo} perform={action => void perform(action)}/>;
+    onOptimize={mode === 'manage' ? openOptimization : undefined} onVideo={openLibraryVideo} perform={action => void perform(action)}/>;
   return <div className="app-shell">
     <header className="app-header">
       <strong>片语</strong>
       {page !== 'library' && <button disabled={working} onClick={backToLibrary}>返回草稿列表</button>}
       {draft && page !== 'workbench' && <button disabled={working} onClick={() => navigate('workbench')}>返回当前草稿</button>}
       <nav className="controls" aria-label="工作区导航">
-        <button aria-pressed={page === 'assets'} disabled={working} onClick={() => navigate('assets')}>全局素材库</button>
-        <button aria-pressed={page === 'optimization'} disabled={working} onClick={() => navigate('optimization')}>AI 图片优化</button>
+        <button aria-pressed={page === 'assets' || page === 'optimization'} disabled={working} onClick={() => navigate('assets')}>全局素材库</button>
       </nav>
       <span role="status">{draft ? saveStatus : '本地保存'}</span>
       <button onClick={() => setAbout(true)}>使用与存储</button>
@@ -156,7 +155,7 @@ export function App() {
       <p>{job.message}</p><button onClick={() => void cancel()}>取消任务</button>
     </div>}
     {assetPicker && <Modal title={assetPicker === 'ai' ? '选择优化原图' : '添加图片'} onClose={() => setAssetPicker(null)} busy={working} wide>{renderAssets(assetPicker === 'ai' ? 'ai' : 'pick')}</Modal>}
-    {cropAsset && <CropEditor asset={cropAsset} busy={working} optimize={() => openOptimization(cropAsset)} close={() => setCropAsset(null)} remove={() => {
+    {cropAsset && <CropEditor asset={cropAsset} busy={working} close={() => setCropAsset(null)} remove={() => {
       const current = draftRef.current; if (current) change({ items: current.items.filter(item => item.id !== cropAsset.id) });
       setCropAsset(null);
     }} save={edits => void perform(async () => {

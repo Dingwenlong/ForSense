@@ -4,7 +4,7 @@ import { errorText } from './hooks';
 
 export function AssetBrowser({ busy, refreshKey, mode = 'manage', excludeIds = [], onImport, onUse, onOptimize, onVideo, perform }: {
   busy: boolean; refreshKey: number; mode?: 'manage' | 'pick' | 'ai'; excludeIds?: string[];
-  onImport: () => void; onUse?: (items: MediaAsset[]) => void; onOptimize: (asset: MediaAsset) => void;
+  onImport: () => void; onUse?: (items: MediaAsset[]) => void; onOptimize?: (asset: MediaAsset) => void;
   onVideo: (id: string) => void; perform: (action: () => Promise<void>) => void;
 }) {
   const [data, setData] = useState<LibrarySnapshot>({ assets: [], videos: [], warnings: [] }), [loading, setLoading] = useState(true), [error, setError] = useState('');
@@ -74,11 +74,11 @@ export function AssetBrowser({ busy, refreshKey, mode = 'manage', excludeIds = [
       <div className="controls"><label>素材名称 <input aria-label="素材名称" maxLength={240} value={name} onChange={e => setName(e.target.value)}/></label>
         <button disabled={busy || !name.trim() || name.trim() === detail.name} onClick={() => update(detail.id, { name })}>保存名称</button>
         <button disabled={busy} onClick={() => perform(() => window.desktop.copyImage(detail.id))}>复制图片</button>
-        {detail.kind === 'image' && <button disabled={busy} onClick={() => onOptimize(detail)}>AI 图片优化</button>}
+        {mode === 'manage' && detail.kind === 'image' && onOptimize && <button disabled={busy} onClick={() => onOptimize(detail)}>AI 图片优化</button>}
         {mode === 'manage' && <button disabled={busy} onClick={() => update(detail.id, { archived: !detail.archived })}>{detail.archived ? '恢复到素材库' : '归档素材'}</button>}
       </div>
       {mode === 'manage' && <p>归档仅在素材库中隐藏；草稿中的图片和原文件保留，可从“已归档”恢复。</p>}
-      {detail.optimization && <p>此图由你手动导入为优化结果，已保存对应原图与提示词，可进入 AI 图片优化查看对比。</p>}
+      {detail.optimization && <p>此图由你手动导入为优化结果，已保存对应原图与提示词，可在全局素材库的素材详情中进入 AI 图片优化查看对比。</p>}
     </section>}
     {onUse && mode !== 'ai' && <footer className="asset-picker-footer controls">
       <span>已选 {eligible.length} 张</span><button disabled={busy || !eligible.length} onClick={() => { onUse(eligible); setSelected([]); }}>加入当前草稿</button>
