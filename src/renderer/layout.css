@@ -137,6 +137,8 @@ img, video { max-width: 100%; }
 .modal-header, .modal-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; justify-content: space-between; }
 .modal-header { border-bottom: 1px solid GrayText; margin-bottom: 12px; }
 .modal-header h2 { margin: 0 0 12px; }
+.modal-header > .back-button { margin-bottom: 12px; }
+.modal-header > h2 { flex: 1; }
 .modal-footer { margin-top: 16px; border-top: 1px solid GrayText; padding-top: 12px; }
 .lightbox { display: flex; align-items: center; justify-content: center; height: 65vh; }
 .lightbox img, .lightbox video { max-height: 100%; object-fit: contain; }

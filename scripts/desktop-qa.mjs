@@ -45,6 +45,7 @@ try {
 
   await launch();
   assert.equal(await page.locator('.library-card').count(), 0);
+  assert.equal(await page.getByRole('button', { name: '返回上一层', exact: true }).count(), 0);
   await page.screenshot({ path: path.join(output, '01-library.png') });
   record('Packaged app opens its empty draft library');
 
@@ -61,9 +62,22 @@ try {
   const originalCard = () => page.locator(`.library-card[data-draft-id="${originalDraftId}"]`);
   const caption = '把时间留给风，把心情留给海。\n\n走走停停，收集一些简单的快乐。🌊\n#周末日常 #慢生活';
   await page.getByRole('textbox', { name: '发布文案', exact: true }).fill(caption);
+  assert.equal(await page.getByRole('textbox', { name: '发布文案', exact: true }).inputValue(), caption);
   await waitFor(async () => await page.evaluate(async id => (await window.desktop.listDrafts()).drafts.find(d => d.id === id)?.caption, originalDraftId) === caption);
   await page.screenshot({ path: path.join(output, '03-wechat-caption.png') });
   record('WeChat caption editing updates the preview and saves the complete text');
+
+  await page.getByRole('navigation', { name: '工作区导航' }).getByRole('button', { name: '素材库', exact: true }).click();
+  await page.getByRole('heading', { name: '素材库', exact: true }).waitFor();
+  await page.getByRole('button', { name: '返回上一层', exact: true }).click();
+  await page.getByRole('region', { name: '预览工作台', exact: true }).waitFor();
+  assert.equal(await page.getByRole('textbox', { name: '发布文案', exact: true }).inputValue(), caption);
+  await page.locator('.wechat-proof__add').click();
+  const firstPicker = page.getByRole('dialog', { name: '添加图片', exact: true });
+  await firstPicker.getByRole('button', { name: '返回上一层', exact: true }).click();
+  await firstPicker.waitFor({ state: 'hidden' });
+  assert.equal(await page.locator('.wechat-proof').count(), 1);
+  record('Home has no back button; library returns to the originating draft and picker back returns to its parent');
 
   await selectFiles(images.slice(0, 3));
   await page.locator('.wechat-proof__add').click();
@@ -109,7 +123,7 @@ try {
   assert.equal(await page.locator('.douyin-proof__image img').getAttribute('src'), movingImage);
   await page.locator('.douyin-proof__image').click();
   await page.getByRole('dialog', { name: '调整画面' }).waitFor();
-  await page.getByRole('button', { name: '取消', exact: true }).click();
+  await page.getByRole('dialog', { name: '调整画面' }).getByRole('button', { name: '返回上一层', exact: true }).click();
   await page.screenshot({ path: path.join(output, '06-douyin-preview.png') });
   record('Douyin placeholder adds a fourth image and inline caption editing updates topics');
 
@@ -136,7 +150,7 @@ try {
   await page.locator('.douyin-proof__image').click();
   await page.getByRole('dialog', { name: '调整画面' }).getByRole('button', { name: '移除图片', exact: true }).click();
   await waitFor(async () => (await page.locator('.image-counter').innerText()).endsWith('/3'));
-  await page.getByRole('button', { name: '返回草稿列表', exact: true }).click();
+  await page.getByRole('button', { name: '返回上一层', exact: true }).click();
   await page.getByRole('heading', { name: '我的草稿', exact: true }).waitFor();
   assert.equal(await page.locator('.library-card').count(), 2);
   assert.equal(await originalCard().locator('.draft-caption-name').innerText(), douyinCaption.replace(/\s+/g, ' ').trim());
@@ -159,7 +173,7 @@ try {
   await page.screenshot({ path: path.join(output, '12-tag-search.png') });
   await page.getByRole('button', { name: '清空搜索', exact: true }).click();
   await originalCard().locator('.library-card-open').click();
-  await page.getByRole('button', { name: '返回草稿列表', exact: true }).click();
+  await page.getByRole('button', { name: '返回上一层', exact: true }).click();
   await page.locator('.library-card').filter({ hasText: '副本' }).getByRole('button', { name: /^删除草稿 / }).click();
   await page.getByRole('dialog', { name: '删除这份草稿？' }).getByRole('button', { name: '删除草稿', exact: true }).click();
   await page.getByRole('dialog', { name: '删除这份草稿？' }).waitFor({ state: 'hidden' });
@@ -181,7 +195,7 @@ try {
   await page.getByRole('checkbox', { name: '保留原声', exact: true }).uncheck();
   await page.getByRole('button', { name: '制作并保存到素材库', exact: true }).click();
   await page.getByText('素材已保存到素材库', { exact: true }).waitFor();
-  await page.getByRole('button', { name: '返回素材库', exact: true }).click();
+  await page.getByRole('dialog', { name: '视频取材', exact: true }).getByRole('button', { name: '返回上一层', exact: true }).click();
   await dismissNotice();
   assert.equal(await page.evaluate(async id => (await window.desktop.listDrafts()).drafts.find(d => d.id === id).items.length, originalDraftId), 4);
   await page.getByRole('checkbox', { name: /^选择 短视频\.mp4 · .*秒$/ }).check();
@@ -193,7 +207,7 @@ try {
   assert.equal(await photos().count(), 6);
   await page.locator('.wechat-proof__live').click();
   await page.getByRole('dialog', { name: '实况预览' }).waitFor();
-  await page.getByRole('button', { name: '关闭窗口', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: '返回上一层', exact: true }).click();
   record('Video tools save frames and Live Photos to the library; selecting them adds ordered assets to the draft');
 
   await page.getByRole('button', { name: '导出素材包', exact: true }).click();
@@ -210,14 +224,14 @@ try {
   await page.screenshot({ path: path.join(output, '07-export.png') });
   record('Preview toolbar exports ordered images, Live Photo formats and inline caption');
 
-  await page.getByRole('button', { name: '关闭窗口', exact: true }).click();
+  await page.getByRole('dialog', { name: '导出完成', exact: true }).getByRole('button', { name: '返回上一层', exact: true }).click();
   await page.getByRole('button', { name: '导出素材包', exact: true }).click();
   await page.getByRole('button', { name: /ZIP 压缩包/ }).click();
   await page.getByRole('button', { name: '开始导出', exact: true }).click();
   await page.getByRole('heading', { name: '素材包已保存', exact: true }).waitFor();
   const zip = await page.locator('.export-success .destination-path').innerText();
   assert.equal((await readFile(zip)).subarray(0, 2).toString(), 'PK');
-  await page.getByRole('button', { name: '关闭窗口', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: '返回上一层', exact: true }).click();
   record('ZIP export remains available from the preview toolbar');
 
   await page.getByRole('textbox', { name: '发布文案', exact: true }).fill(douyinCaption + '\n刚刚补上的一句。');
@@ -228,7 +242,7 @@ try {
   assert.equal(await photos().count(), 6);
   record('Closing while editing inline caption flushes the draft for restart');
 
-  await page.getByRole('button', { name: '返回草稿列表', exact: true }).click();
+  await page.getByRole('button', { name: '返回上一层', exact: true }).click();
   await page.getByRole('button', { name: '新建草稿', exact: true }).click();
   await page.getByRole('switch', { name: '抖音预览', exact: true }).click();
   await page.locator('.douyin-proof__add-empty').waitFor();
@@ -244,7 +258,7 @@ try {
   assert.equal(JSON.parse(await readFile(path.join(textOnlyFolder, '素材清单.json'), 'utf8')).items.length, 0);
   record('Text-only Douyin draft can be edited and exported directly in preview');
 
-  await page.getByRole('button', { name: '关闭窗口', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: '返回上一层', exact: true }).click();
   await dismissNotice();
   await page.getByRole('navigation', { name: '工作区导航' }).getByRole('button', { name: '素材库', exact: true }).click();
   await page.getByRole('heading', { name: '素材库', exact: true }).waitFor();
@@ -339,9 +353,10 @@ try {
   await page.locator('.douyin-proof__add').click();
   await picker.getByRole('searchbox', { name: '搜索素材', exact: true }).fill('案例原图');
   assert.equal(await picker.getByRole('checkbox', { name: '选择 案例原图', exact: true }).isDisabled(), true);
-  await picker.getByRole('button', { name: '关闭窗口', exact: true }).click();
+  await picker.getByRole('button', { name: '返回上一层', exact: true }).click();
   await application.close(); application = null;
   await launch();
+  await page.getByRole('navigation', { name: '工作区导航' }).getByRole('button', { name: '素材库', exact: true }).click();
   await page.getByRole('navigation', { name: '工作区导航' }).getByRole('button', { name: '素材库', exact: true }).click();
   await page.getByRole('combobox', { name: '素材分类', exact: true }).selectOption('ai');
   await page.getByRole('button', { name: '查看素材 product-after.png', exact: true }).click();
@@ -350,11 +365,16 @@ try {
   assert.equal(await page.locator('.optimization-result img').count(), 2);
   record('Preview + reuses library assets without duplicates; comparison and prompt survive restart');
 
-  await page.getByRole('button', { name: '返回草稿列表', exact: true }).click();
+  await page.getByRole('button', { name: '返回上一层', exact: true }).click();
+  await page.getByRole('heading', { name: '素材库', exact: true }).waitFor();
+  await page.getByRole('button', { name: '返回上一层', exact: true }).click();
+  await page.getByRole('heading', { name: '我的草稿', exact: true }).waitFor();
+  assert.equal(await page.getByRole('button', { name: '返回上一层', exact: true }).count(), 0);
+  record('AI returns to its library parent and then home; repeated navigation creates no back loop');
   while (await page.locator('.library-card').count() < 10) {
     await page.getByRole('button', { name: '新建草稿', exact: true }).click();
     await page.getByRole('region', { name: '预览工作台', exact: true }).waitFor();
-    await page.getByRole('button', { name: '返回草稿列表', exact: true }).click();
+    await page.getByRole('button', { name: '返回上一层', exact: true }).click();
     await page.getByRole('heading', { name: '我的草稿', exact: true }).waitFor();
   }
   assert.equal(await page.getByRole('button', { name: '新建草稿', exact: true }).isDisabled(), true);
@@ -371,7 +391,7 @@ try {
   await page.screenshot({ path: path.join(output, '13-draft-limit.png') });
   await page.locator('.library-card').first().locator('.library-card-open').click();
   assert.equal(await page.getByRole('button', { name: '另存草稿', exact: true }).isDisabled(), true);
-  await page.getByRole('button', { name: '返回草稿列表', exact: true }).click();
+  await page.getByRole('button', { name: '返回上一层', exact: true }).click();
   await page.locator('.library-card').first().getByRole('button', { name: /^删除草稿 / }).click();
   await page.getByRole('dialog', { name: '删除这份草稿？' }).getByRole('button', { name: '删除草稿', exact: true }).click();
   await page.getByRole('dialog', { name: '删除这份草稿？' }).waitFor({ state: 'hidden' });

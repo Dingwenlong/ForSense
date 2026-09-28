@@ -12,8 +12,11 @@ import { BackButton } from './BackButton';
 import { AssetBrowser } from './AssetBrowser';
 import { OptimizationPage, emptyOptimizationSession, type OptimizationSession } from './OptimizationPage';
 
+type Page = 'library' | 'workbench' | 'assets' | 'optimization';
+
 export function App() {
-  const [drafts, setDrafts] = useState<Draft[]>([]), [draft, setDraft] = useState<Draft | null>(null), [page, setPage] = useState<'library' | 'workbench' | 'assets' | 'optimization'>('library'), [filter, setFilter] = useState<'all' | 'moments' | 'douyin'>('all'), [query, setQuery] = useState('');
+  const [drafts, setDrafts] = useState<Draft[]>([]), [draft, setDraft] = useState<Draft | null>(null), [pageStack, setPageStack] = useState<Page[]>(['library']), [filter, setFilter] = useState<'all' | 'moments' | 'douyin'>('all'), [query, setQuery] = useState('');
+  const page = pageStack[pageStack.length - 1];
   const [libraryRevision, setLibraryRevision] = useState(0), [assetPicker, setAssetPicker] = useState<'draft' | 'ai' | null>(null);
   const [optimization, setOptimization] = useState<OptimizationSession>(emptyOptimizationSession);
   const [busy, setBusy] = useState(false), [loading, setLoading] = useState(true);
@@ -62,9 +65,18 @@ export function App() {
     catch (error) { const text = errorText(error); if (!text.includes('取消')) setNotice({ text, error: true, retry: () => void perform(action) }); }
     finally { setBusy(false); }
   }
-  const select = (item: Draft) => { void perform(async () => { await flush(); const current = (await window.desktop.listDrafts()).drafts.find(d => d.id === item.id); show(current || item); setPage('workbench'); }); };
-  const newDraft = () => { void perform(async () => { await flush(); const next = await window.desktop.createDraft('moments'); updateList(next); show(next); setQuery(''); setFilter('all'); setPage('workbench'); }); };
-  const backToLibrary = () => { if (working) return; void perform(async () => { await flush(); setPage('library'); }); };
+  function openPage(next: Page) {
+    setPageStack(previous => {
+      const index = previous.indexOf(next);
+      return index < 0 ? [...previous, next] : previous.slice(0, index + 1);
+    });
+  }
+  const select = (item: Draft) => { void perform(async () => { await flush(); const current = (await window.desktop.listDrafts()).drafts.find(d => d.id === item.id); show(current || item); openPage('workbench'); }); };
+  const newDraft = () => { void perform(async () => { await flush(); const next = await window.desktop.createDraft('moments'); updateList(next); show(next); setQuery(''); setFilter('all'); openPage('workbench'); }); };
+  const goBack = () => {
+    if (working || pageStack.length <= 1) return;
+    void perform(async () => { await flush(); setPageStack(previous => previous.length > 1 ? previous.slice(0, -1) : previous); });
+  };
   const addItems = (items: MediaAsset[]) => { const current = draftRef.current; if (current) {
     const unique = new Map(current.items.map(item => [item.id, item])); for (const item of items) unique.set(item.id, item);
     if (unique.size > 200) throw new Error('每份草稿最多整理 200 个素材，请新建草稿继续添加'); change({ items: [...unique.values()] });
@@ -76,7 +88,7 @@ export function App() {
     const result = await run<{ path: string }>('export', { draftId: draftRef.current.id, directory: exportDirectory, format: exportFormat, targets }); setExportResult(result.path);
   }); };
   const hasLive = draft?.items.some(item => item.kind === 'live');
-  const navigate = (next: typeof page) => void perform(async () => { await flush(); setPage(next); });
+  const navigate = (next: Page) => void perform(async () => { await flush(); openPage(next); });
   const copyImage = (id: string) => void perform(async () => { await window.desktop.copyImage(id); setNotice({ text: '图片已复制，请先粘贴到外部工具，再复制提示词' }); });
   const copyPrompt = (prompt: string) => void perform(async () => { await window.desktop.copyText(prompt); setNotice({ text: '提示词已复制' }); });
   const openOptimization = (asset: MediaAsset) => void perform(async () => {
@@ -85,7 +97,7 @@ export function App() {
       const original = await window.desktop.getAsset(asset.optimization.sourceId);
       setOptimization({ source: original, result: asset, templateId: asset.optimization.templateId, prompt: asset.optimization.prompt, step: 3 });
     } else setOptimization(previous => ({ ...previous, source: asset, result: null, step: 2 }));
-    setAssetPicker(null); setPage('optimization');
+    setAssetPicker(null); openPage('optimization');
   });
   const importToLibrary = () => void perform(async () => {
     const paths = await window.desktop.pickImages(); if (!paths.length) return;
@@ -100,7 +112,7 @@ export function App() {
   const openLibraryVideo = (id: string) => void perform(async () => {
     await flush(); setVideoSource(id ? await window.desktop.getVideo(id) : null); setVideoOpen(true); setAssetPicker(null);
   });
-  const selectLibraryItems = (items: MediaAsset[]) => void perform(async () => { addItems(items); setAssetPicker(null); setPage('workbench'); setNotice({ text: '素材已加入当前草稿' }); });
+  const selectLibraryItems = (items: MediaAsset[]) => void perform(async () => { addItems(items); setAssetPicker(null); openPage('workbench'); setNotice({ text: '素材已加入当前草稿' }); });
   const renderAssets = (mode: 'manage' | 'pick' | 'ai') => <AssetBrowser busy={working} refreshKey={libraryRevision} mode={mode}
     excludeIds={mode === 'ai' ? [] : draft?.items.map(item => item.id)}
     onImport={mode === 'ai' ? importOptimizationSource : mode === 'pick' ? () => void perform(async () => {
@@ -112,7 +124,7 @@ export function App() {
   return <div className="app-shell">
     <header className="app-header">
       <strong>片语</strong>
-      {page !== 'library' && page !== 'workbench' && <BackButton disabled={working} onClick={backToLibrary}/>}
+      {page !== 'library' && page !== 'workbench' && <BackButton disabled={working || loading} onClick={goBack}/>}
       <nav className="controls" aria-label="工作区导航">
         <button aria-pressed={page === 'assets' || page === 'optimization'} disabled={working} onClick={() => navigate('assets')}>素材库</button>
       </nav>
@@ -131,7 +143,7 @@ export function App() {
           setOptimization(previous => ({ ...previous, result })); setNotice({ text: '优化结果已保存到素材库，原图保留' });
         })}/> : page === 'library' || !draft ?
         <LibraryPage drafts={drafts} filter={filter} query={query} busy={working} setFilter={setFilter} setQuery={setQuery} open={select} remove={setDeleteTarget} create={newDraft}/> :
-        <WorkbenchPage draft={draft} busy={working} canSaveAs={drafts.length < MAX_DRAFTS} change={change} importFiles={importFiles} addImages={() => setAssetPicker('draft')} back={backToLibrary}
+        <WorkbenchPage draft={draft} busy={working} canSaveAs={drafts.length < MAX_DRAFTS} change={change} importFiles={importFiles} addImages={() => setAssetPicker('draft')} back={goBack}
           reorder={reorder} edit={setCropAsset}
           rejectVideoDrop={() => setNotice({ text: '请到素材库使用“从视频取材”', error: true })}
           saveAs={() => void perform(async () => {
@@ -201,7 +213,7 @@ export function App() {
           await window.desktop.deleteDraft(deleteTarget.id);
           setDrafts(previous => previous.filter(d => d.id !== deleteTarget.id));
           if (draftRef.current?.id === deleteTarget.id) show(null);
-          setPage('library'); setDeleteTarget(null);
+          openPage('library'); setDeleteTarget(null);
         })}>删除草稿</button>
       </footer>
     </Modal>}
