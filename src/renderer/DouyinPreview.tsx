@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useTextareaHeight } from './hooks';
 import type { Draft, MediaAsset } from '../shared/types';
 import { acceptsPreviewDrag, beginPreviewDrag, previewDragSource } from './previewDrag';
 
@@ -26,10 +27,7 @@ export function DouyinPreview({ draft, busy, editing, onRemove, current, index, 
   const captionRef = useRef<HTMLTextAreaElement>(null);
   const tags = [...new Set([...draft.caption.matchAll(/#[^\s#]+/gu)].map(match => match[0]))];
   const captionParts = draft.caption.split(/(#[^\s#]+)/gu);
-  useLayoutEffect(() => {
-    const field = captionRef.current; if (!field) return;
-    field.style.height = 'auto'; field.style.height = `${Math.max(76, field.scrollHeight)}px`;
-  }, [draft.caption, editingCaption]);
+  useTextareaHeight(captionRef, draft.caption, 76, editingCaption);
   const targetOnBar = (clientX: number, left: number, width: number) =>
     Math.max(0, Math.min(draft.items.length - 1, Math.floor(((clientX - left) / width) * draft.items.length)));
   const targetOnStage = (clientX: number, left: number, width: number) =>

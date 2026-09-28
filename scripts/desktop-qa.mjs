@@ -67,6 +67,44 @@ try {
   await page.screenshot({ path: path.join(output, '03-wechat-caption.png') });
   record('WeChat caption editing updates the preview and saves the complete text');
 
+  const sizeBox = page.locator('.preview-viewport');
+  const widthField = page.getByRole('spinbutton', { name: '预览宽度', exact: true });
+  const heightField = page.getByRole('spinbutton', { name: '预览高度', exact: true });
+  const deviceSelect = page.getByRole('combobox', { name: '预览机型', exact: true });
+  const longCaption = caption + '\n' + '窄屏排版也要保留完整文案与表情。👨‍👩‍👧‍👦 '.repeat(25);
+  await page.getByRole('textbox', { name: '发布文案', exact: true }).fill(longCaption);
+  await waitFor(async () => await page.evaluate(async id => (await window.desktop.listDrafts()).drafts.find(d => d.id === id)?.caption, originalDraftId) === longCaption);
+  const originalSnapshot = await page.evaluate(async id => (await window.desktop.listDrafts()).drafts.find(d => d.id === id), originalDraftId);
+  await deviceSelect.selectOption('iphone-se');
+  await waitFor(async () => await widthField.inputValue() === '375' && await heightField.inputValue() === '667');
+  const presetRect = await sizeBox.boundingBox();
+  assert.equal(presetRect.width, 375); assert.equal(presetRect.height, 667);
+  await widthField.fill('460'); await widthField.press('Enter');
+  await heightField.fill('500'); await heightField.press('Enter');
+  assert.equal(await deviceSelect.inputValue(), 'custom');
+  await widthField.fill(''); await widthField.press('Tab');
+  assert.equal(await widthField.inputValue(), '460');
+  await widthField.fill('10'); await widthField.press('Enter');
+  assert.equal(await widthField.inputValue(), '240');
+  await waitFor(async () => await page.getByRole('textbox', { name: '发布文案', exact: true }).evaluate(field => field.clientHeight >= field.scrollHeight - 1));
+  assert.equal(await page.getByRole('textbox', { name: '发布文案', exact: true }).inputValue(), longCaption);
+  await widthField.fill('400'); await widthField.press('Enter');
+  await sizeBox.scrollIntoViewIfNeeded();
+  await waitFor(async () => { const rect = await sizeBox.boundingBox(); return rect.width === 400 && rect.height === 500; });
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  const resizeStart = await sizeBox.boundingBox();
+  await page.mouse.move(resizeStart.x + resizeStart.width - 3, resizeStart.y + resizeStart.height - 3);
+  await page.mouse.down();
+  await page.mouse.move(resizeStart.x + resizeStart.width + 37, resizeStart.y + resizeStart.height + 57, { steps: 12 });
+  await page.mouse.up();
+  await waitFor(async () => Number(await widthField.inputValue()) > 420 && Number(await heightField.inputValue()) > 540);
+  assert.deepEqual(await page.evaluate(async id => (await window.desktop.listDrafts()).drafts.find(d => d.id === id), originalDraftId), originalSnapshot);
+  await page.screenshot({ path: path.join(output, '15-custom-preview-size.png') });
+  await page.getByRole('button', { name: '重置尺寸', exact: true }).click();
+  await page.getByRole('textbox', { name: '发布文案', exact: true }).fill(caption);
+  await waitFor(async () => await page.evaluate(async id => (await window.desktop.listDrafts()).drafts.find(d => d.id === id)?.caption, originalDraftId) === caption);
+  record('Device preset, custom width/height and resize handle change preview geometry without modifying the draft');
+
   await page.getByRole('navigation', { name: '工作区导航' }).getByRole('button', { name: '素材库', exact: true }).click();
   await page.getByRole('heading', { name: '素材库', exact: true }).waitFor();
   await page.getByRole('button', { name: '返回上一层', exact: true }).click();
@@ -274,11 +312,17 @@ try {
   record('ZIP export remains available from the preview toolbar');
 
   await page.getByRole('textbox', { name: '发布文案', exact: true }).fill(douyinCaption + '\n刚刚补上的一句。');
+  await deviceSelect.selectOption('pixel-7');
   await application.close(); application = null;
   await launch();
   await originalCard().locator('.library-card-open').click();
   assert.equal(await page.getByRole('textbox', { name: '发布文案', exact: true }).inputValue(), douyinCaption + '\n刚刚补上的一句。');
   assert.equal(await photos().count(), 6);
+  assert.equal(await page.getByRole('combobox', { name: '预览机型', exact: true }).inputValue(), 'pixel-7');
+  assert.equal(await page.getByRole('spinbutton', { name: '预览宽度', exact: true }).inputValue(), '412');
+  assert.equal(await page.getByRole('spinbutton', { name: '预览高度', exact: true }).inputValue(), '915');
+  await page.getByRole('button', { name: '重置尺寸', exact: true }).click();
+  record('Preview device and dimensions survive application restart');
   record('Closing while editing inline caption flushes the draft for restart');
 
   await page.getByRole('button', { name: '返回上一层', exact: true }).click();
@@ -466,7 +510,7 @@ try {
   record('Export path boundary and renderer runtime remain sound');
   await writeFile(path.join(output, 'qa-results.json'), JSON.stringify({ passed: true, assertions, rendererErrors: errors, clipboardReadback: clipboardAvailable ? 'passed' : 'unavailable in this Windows test session; failure reporting verified; successful native paste requires interactive-session verification', nativeDeviceTests: 'not performed', cleanVirtualMachine: 'not performed; packaged executable tested with restricted child PATH' }, null, 2));
 } catch (error) {
-  if (page) { try { await page.screenshot({ path: path.join(output, 'failure.png') }); await writeFile(path.join(output, 'failure-dom.txt'), await page.locator('body').innerText()); } catch {} }
+  if (page) { try { await page.screenshot({ path: path.join(work, 'failure.png') }); await writeFile(path.join(work, 'failure-dom.txt'), await page.locator('body').innerText()); } catch {} }
   throw error;
 } finally {
   if (application) await application.close().catch(() => {});

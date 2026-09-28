@@ -2,12 +2,15 @@ import type { Draft, MediaAsset } from '../shared/types';
 import { useState } from 'react';
 import { Preview } from './Preview';
 import { BackButton } from './BackButton';
+import { PreviewSizeControls, PreviewViewport } from './PreviewViewport';
+import type { PreviewSettings } from '../shared/preview-settings';
 
-export function WorkbenchPage({ draft, busy, canSaveAs, change, importFiles, addImages, reorder, edit, remove, saveAs, rejectVideoDrop, exportPackage, back }: {
+export function WorkbenchPage({ draft, busy, canSaveAs, change, importFiles, addImages, reorder, edit, remove, saveAs, rejectVideoDrop, exportPackage, back, previewSettings, setPreviewSettings }: {
   draft: Draft; busy: boolean; canSaveAs: boolean; change: (patch: Partial<Draft>) => void;
   importFiles: (paths?: string[]) => void; addImages: () => void; reorder: (from: number, to: number) => void;
   edit: (asset: MediaAsset) => void; remove: (id: string) => void; saveAs: () => void;
   rejectVideoDrop: () => void; exportPackage: () => void; back: () => void;
+  previewSettings: PreviewSettings; setPreviewSettings: (next: PreviewSettings) => void;
 }) {
   const [editing, setEditing] = useState(false);
   function handleFiles(files: FileList) {
@@ -29,15 +32,16 @@ export function WorkbenchPage({ draft, busy, canSaveAs, change, importFiles, add
         <span>抖音</span>
       </div>
       <button disabled={busy} aria-pressed={editing} onClick={() => setEditing(value => !value)}>{editing ? '完成编辑' : '编辑模式'}</button>
+      <PreviewSizeControls settings={previewSettings} onChange={setPreviewSettings} disabled={busy}/>
       <div className="workbench-actions">
         <button disabled={busy || !canSaveAs} title={canSaveAs ? undefined : '草稿已达 10 份上限，请先在列表删除不需要的草稿'} onClick={saveAs}>另存草稿</button>
         <button disabled={busy || (!draft.items.length && !draft.caption.trim())} onClick={exportPackage}>导出素材包</button>
       </div>
     </div>
     <div className="workbench-preview" aria-label="实时预览">
-      <div className="workbench-preview-scroll"><Preview draft={draft} busy={busy} editing={editing} onEdit={edit}
+      <div className="workbench-preview-scroll"><PreviewViewport settings={previewSettings} onChange={setPreviewSettings} busy={busy}><Preview draft={draft} busy={busy} editing={editing} onEdit={edit}
         onRemove={id => { if (editing && !busy) remove(id); }} onReorder={(from, to) => { if (editing && !busy) reorder(from, to); }}
-        onAddImages={addImages} onCaptionChange={caption => change({ caption })}/></div>
+        onAddImages={addImages} onCaptionChange={caption => change({ caption })}/></PreviewViewport></div>
     </div>
   </section>;
 }

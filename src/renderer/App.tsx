@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Draft, MediaAsset, VideoSource } from '../shared/types';
 import { MAX_DRAFTS } from '../shared/types';
 import { draftName } from '../shared/draft-name';
+import { DEFAULT_PREVIEW, PREVIEW_STORAGE_KEY, normalizePreviewSettings } from '../shared/preview-settings';
 import { useJobs, errorText } from './hooks';
 import { Modal } from './Modal';
 import { CropEditor } from './CropEditor';
@@ -17,6 +18,11 @@ type Page = 'library' | 'workbench' | 'assets' | 'optimization';
 export function App() {
   const [drafts, setDrafts] = useState<Draft[]>([]), [draft, setDraft] = useState<Draft | null>(null), [pageStack, setPageStack] = useState<Page[]>(['library']), [filter, setFilter] = useState<'all' | 'moments' | 'douyin'>('all'), [query, setQuery] = useState('');
   const page = pageStack[pageStack.length - 1];
+  const [previewSettings, setPreviewSettings] = useState(() => {
+    try { return normalizePreviewSettings(JSON.parse(localStorage.getItem(PREVIEW_STORAGE_KEY) || 'null')); }
+    catch { return { ...DEFAULT_PREVIEW }; }
+  });
+  useEffect(() => { try { localStorage.setItem(PREVIEW_STORAGE_KEY, JSON.stringify(previewSettings)); } catch { /* Keep the current preview usable when preference storage is unavailable. */ } }, [previewSettings]);
   const [libraryRevision, setLibraryRevision] = useState(0), [assetPicker, setAssetPicker] = useState<'draft' | 'ai' | null>(null);
   const [optimization, setOptimization] = useState<OptimizationSession>(emptyOptimizationSession);
   const [busy, setBusy] = useState(false), [loading, setLoading] = useState(true);
@@ -144,6 +150,7 @@ export function App() {
         })}/> : page === 'library' || !draft ?
         <LibraryPage drafts={drafts} filter={filter} query={query} busy={working} setFilter={setFilter} setQuery={setQuery} open={select} remove={setDeleteTarget} create={newDraft}/> :
         <WorkbenchPage key={draft.id} draft={draft} busy={working} canSaveAs={drafts.length < MAX_DRAFTS} change={change} importFiles={importFiles} addImages={() => setAssetPicker('draft')} back={goBack}
+          previewSettings={previewSettings} setPreviewSettings={next => setPreviewSettings(normalizePreviewSettings(next))}
           reorder={reorder} edit={setCropAsset} remove={id => { const current = draftRef.current; if (current) change({ items: current.items.filter(item => item.id !== id) }); }}
           rejectVideoDrop={() => setNotice({ text: '请到素材库使用“从视频取材”', error: true })}
           saveAs={() => void perform(async () => {

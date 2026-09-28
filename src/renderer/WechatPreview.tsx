@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useTextareaHeight } from './hooks';
 import type { Draft, MediaAsset } from '../shared/types';
 import { acceptsPreviewDrag, beginPreviewDrag, previewDragSource } from './previewDrag';
 
@@ -19,10 +20,7 @@ export function WechatPreview({ draft, busy, editing, onRemove, onEdit, onReorde
   const suppressClick = useRef(false);
   useEffect(() => { setDropIndex(null); suppressClick.current = false; }, [editing]);
   const captionRef = useRef<HTMLTextAreaElement>(null);
-  useLayoutEffect(() => {
-    const field = captionRef.current; if (!field) return;
-    field.style.height = 'auto'; field.style.height = `${Math.max(152, field.scrollHeight)}px`;
-  }, [draft.caption]);
+  useTextareaHeight(captionRef, draft.caption, 152);
   return <div className="wechat-proof" aria-label="微信朋友圈发表排版预览">
     <div className="wechat-proof__header" aria-label="发表栏示意">
       <span>取消</span><span className="wechat-proof__publish">发表</span>

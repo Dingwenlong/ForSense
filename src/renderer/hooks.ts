@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type { RefObject } from 'react';
 import type { ExportJob, JobKind } from '../shared/types';
 export function useJobs() {
   const [job, setJob] = useState<ExportJob | null>(null);
@@ -21,3 +22,26 @@ export function useJobs() {
 }
 export const timeLabel = (time: number) => `${Math.floor(time / 60).toString().padStart(2, '0')}:${(time % 60).toFixed(2).padStart(5, '0')}`;
 export function errorText(error: unknown) { return (error instanceof Error ? error.message : '操作失败，请重试').replace(/^Error invoking remote method '[^']+': Error: /, ''); }
+
+export function useTextareaHeight(ref: RefObject<HTMLTextAreaElement | null>, value: string, minHeight: number, active = true) {
+  useLayoutEffect(() => {
+    const field = ref.current; if (!field || !active) return;
+    const resize = () => {
+      // Pin the current width while measuring: collapsing height may temporarily remove the parent's scrollbar.
+      const previousWidth = field.style.width;
+      field.style.width = `${field.getBoundingClientRect().width}px`;
+      field.style.height = 'auto';
+      field.style.height = `${Math.max(minHeight, field.scrollHeight)}px`;
+      field.style.width = previousWidth;
+    };
+    let width = field.clientWidth, frame = 0;
+    resize();
+    const observer = new ResizeObserver(() => {
+      if (field.clientWidth !== width) {
+        width = field.clientWidth; cancelAnimationFrame(frame); frame = requestAnimationFrame(resize);
+      }
+    });
+    observer.observe(field);
+    return () => { observer.disconnect(); cancelAnimationFrame(frame); };
+  }, [ref, value, minHeight, active]);
+}
