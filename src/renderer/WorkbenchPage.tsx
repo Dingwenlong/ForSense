@@ -1,11 +1,12 @@
 import type { Draft, MediaAsset } from '../shared/types';
 import { Preview } from './Preview';
+import { BackButton } from './BackButton';
 
-export function WorkbenchPage({ draft, busy, canSaveAs, change, importFiles, addImages, openVideo, reorder, edit, saveAs, rejectVideoDrop, copy, exportPackage }: {
+export function WorkbenchPage({ draft, busy, canSaveAs, change, importFiles, addImages, openVideo, reorder, edit, saveAs, rejectVideoDrop, copy, exportPackage, back }: {
   draft: Draft; busy: boolean; canSaveAs: boolean; change: (patch: Partial<Draft>) => void;
   importFiles: (paths?: string[]) => void; addImages: () => void; openVideo: () => void; reorder: (from: number, to: number) => void;
   edit: (asset: MediaAsset) => void; saveAs: () => void;
-  rejectVideoDrop: () => void; copy: () => void; exportPackage: () => void;
+  rejectVideoDrop: () => void; copy: () => void; exportPackage: () => void; back: () => void;
 }) {
   function handleFiles(files: FileList) {
     if (busy || !files.length) return;
@@ -18,6 +19,7 @@ export function WorkbenchPage({ draft, busy, canSaveAs, change, importFiles, add
     onDragOver={event => { if (event.dataTransfer.types.includes('Files')) event.preventDefault(); }}
     onDrop={event => { if (!event.dataTransfer.files.length) return; event.preventDefault(); handleFiles(event.dataTransfer.files); }}>
     <div className="workbench-toolbar">
+      <BackButton disabled={busy} onClick={back}/>
       <div className="platform-control" role="group" aria-label="预览平台">
         <span>预览平台</span><span>微信</span>
         <button type="button" role="switch" aria-label="抖音预览" aria-checked={draft.platform === 'douyin'} disabled={busy} className="platform-switch"
@@ -30,7 +32,6 @@ export function WorkbenchPage({ draft, busy, canSaveAs, change, importFiles, add
       <button disabled={busy || (!draft.items.length && !draft.caption.trim())} onClick={exportPackage}>导出素材包</button>
     </div>
     <div className="workbench-preview" aria-label="实时预览">
-      <div className="workbench-preview-head"><h1>实时预览</h1><span>{draft.items.length} 张图片 · {Array.from(draft.caption).length} 字</span></div>
       <div className="workbench-preview-scroll"><Preview draft={draft} busy={busy} onEdit={edit} onReorder={reorder}
         onAddImages={addImages} onCaptionChange={caption => change({ caption })}/></div>
     </div>

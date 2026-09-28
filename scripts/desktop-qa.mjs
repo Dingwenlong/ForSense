@@ -49,7 +49,7 @@ try {
   record('Packaged app opens its empty draft library');
 
   await page.getByRole('button', { name: '新建草稿', exact: true }).click();
-  await page.getByRole('heading', { name: '实时预览', exact: true }).waitFor();
+  await page.getByRole('region', { name: '预览工作台', exact: true }).waitFor();
   assert.equal(await page.locator('.workbench-editor, .asset-card, .editor-tabs').count(), 0);
   assert.equal(await page.locator('.wechat-proof__add').count(), 1);
   assert.equal(await page.getByRole('textbox', { name: '发布文案', exact: true }).count(), 1);
@@ -320,7 +320,7 @@ try {
   await page.locator('.optimization-result').scrollIntoViewIfNeeded();
   await page.screenshot({ path: path.join(output, '11-ai-result.png') });
   await page.getByRole('button', { name: '将结果加入当前草稿', exact: true }).click();
-  await page.getByRole('heading', { name: '实时预览', exact: true }).waitFor();
+  await page.getByRole('region', { name: '预览工作台', exact: true }).waitFor();
   assert.equal(await page.locator('.image-counter').innerText(), '1/1');
   const manualResult = (await page.evaluate(() => window.desktop.listLibrary())).assets.find(a => a.optimization);
   assert.equal(manualResult.optimization.prompt, prompt + '\n自定义：保留完整杯柄。');
@@ -351,7 +351,7 @@ try {
   await page.getByRole('button', { name: '返回草稿列表', exact: true }).click();
   while (await page.locator('.library-card').count() < 10) {
     await page.getByRole('button', { name: '新建草稿', exact: true }).click();
-    await page.getByRole('heading', { name: '实时预览', exact: true }).waitFor();
+    await page.getByRole('region', { name: '预览工作台', exact: true }).waitFor();
     await page.getByRole('button', { name: '返回草稿列表', exact: true }).click();
     await page.getByRole('heading', { name: '我的草稿', exact: true }).waitFor();
   }

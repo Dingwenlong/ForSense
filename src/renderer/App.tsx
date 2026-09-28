@@ -8,6 +8,7 @@ import { CropEditor } from './CropEditor';
 import { VideoTool } from './VideoTool';
 import { LibraryPage } from './pages';
 import { WorkbenchPage } from './WorkbenchPage';
+import { BackButton } from './BackButton';
 import { AssetBrowser } from './AssetBrowser';
 import { OptimizationPage, emptyOptimizationSession, type OptimizationSession } from './OptimizationPage';
 
@@ -111,7 +112,7 @@ export function App() {
   return <div className="app-shell">
     <header className="app-header">
       <strong>片语</strong>
-      {page !== 'library' && <button disabled={working} onClick={backToLibrary}>返回草稿列表</button>}
+      {page !== 'library' && page !== 'workbench' && <BackButton disabled={working} onClick={backToLibrary}/>}
       <nav className="controls" aria-label="工作区导航">
         <button aria-pressed={page === 'assets' || page === 'optimization'} disabled={working} onClick={() => navigate('assets')}>素材库</button>
       </nav>
@@ -130,7 +131,7 @@ export function App() {
           setOptimization(previous => ({ ...previous, result })); setNotice({ text: '优化结果已保存到素材库，原图保留' });
         })}/> : page === 'library' || !draft ?
         <LibraryPage drafts={drafts} filter={filter} query={query} busy={working} setFilter={setFilter} setQuery={setQuery} open={select} remove={setDeleteTarget} create={newDraft}/> :
-        <WorkbenchPage draft={draft} busy={working} canSaveAs={drafts.length < MAX_DRAFTS} change={change} importFiles={importFiles} addImages={() => setAssetPicker('draft')}
+        <WorkbenchPage draft={draft} busy={working} canSaveAs={drafts.length < MAX_DRAFTS} change={change} importFiles={importFiles} addImages={() => setAssetPicker('draft')} back={backToLibrary}
           openVideo={() => setVideoOpen(true)} reorder={reorder} edit={setCropAsset}
           rejectVideoDrop={() => setNotice({ text: '视频请通过“从视频取材”打开', error: true })}
           saveAs={() => void perform(async () => {
