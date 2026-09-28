@@ -23,6 +23,7 @@ img, video { max-width: 100%; }
 .app-header { display: flex; align-items: center; gap: 16px; padding: 10px 18px; border-bottom: 1px solid GrayText; }
 .app-header > span:not([role="status"]) { min-width: 0; flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .app-header > span[role="status"] { white-space: nowrap; }
+.app-header > nav { flex: 1; }
 .page-body { flex: 1; min-height: 0; overflow: auto; }
 .page-content { width: min(100%, 1160px); margin: 0 auto; padding: 16px 22px 24px; }
 .page-content > h1 { margin-top: 4px; }
@@ -169,4 +170,63 @@ img, video { max-width: 100%; }
   .workbench-page { height: auto; }
   .video-workspace { display: block; }
   .workbench-preview-scroll { max-height: 800px; }
+}
+
+/* Shared assets and the manual image-optimization workflow use the same plain controls. */
+.muted { color: #555; }
+.asset-library-tools { margin: 16px 0; gap: 12px; }
+.asset-library-tools input { width: 210px; max-width: 100%; }
+.asset-library-count { color: #555; }
+.material-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); gap: 12px; }
+.material-card { display: flex; flex-direction: column; gap: 8px; min-width: 0; border: 1px solid #b9b9b9; padding: 8px; }
+.material-card-active { outline: 2px solid #333; }
+.material-thumbnail { width: 100%; height: 148px; display: block; border: 0; padding: 0; background: #f2f2f2; }
+.material-thumbnail img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.material-card > video { width: 100%; height: 148px; background: #111; }
+.material-card > strong { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.material-card > span { font-size: 12px; color: #555; }
+.material-card > .controls { margin-top: auto; justify-content: space-between; }
+.material-detail { margin-top: 20px; border-top: 1px solid #aaa; padding-top: 12px; overflow-wrap: anywhere; }
+.material-detail h3 { margin: 0 12px 0 0; }
+.material-live-preview { display: block; max-height: 240px; margin: 12px 0; }
+.asset-picker-footer { position: sticky; bottom: -16px; padding: 14px 0; margin-top: 16px; background: Canvas; border-top: 1px solid GrayText; }
+.library-empty { padding: 24px 0; }
+.optimization-tabs { margin: 18px 0; }
+.optimization-steps { border-top: 1px solid #bbb; border-bottom: 1px solid #bbb; padding: 12px 0; gap: 12px; margin-bottom: 20px; }
+.optimization-source figure { margin: 20px 0; }
+.optimization-source figure img { max-height: 300px; display: block; }
+.optimization-source figcaption { margin: 8px 0; }
+.template-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 16px 0; }
+.template-option { display: flex; flex-direction: column; gap: 6px; text-align: left; padding: 14px; }
+.template-option span { color: #555; font-size: 13px; }
+.optimization-editor { display: grid; grid-template-columns: minmax(240px, .8fr) minmax(340px, 1.2fr); gap: 28px; }
+.optimization-editor > section { min-width: 0; }
+.optimization-input { display: block; width: 100%; height: 320px; object-fit: contain; background: #f3f3f3; }
+.optimization-editor p { overflow-wrap: anywhere; }
+.prompt-label { display: block; margin: 14px 0; }
+.prompt-label textarea { display: block; width: 100%; height: 245px; resize: vertical; padding: 10px; line-height: 1.7; margin-top: 6px; }
+.template-requirements { padding-left: 10px; border-left: 2px solid #777; }
+.optimization-result { border-top: 1px solid #bbb; margin-top: 24px; padding-top: 12px; }
+.optimization-result > .before-after { max-width: 760px; }
+.example-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; align-items: start; }
+.optimization-example { border: 1px solid #bbb; padding: 16px; }
+.optimization-example h2 { margin-top: 0; }
+.optimization-example > .controls { margin-top: 14px; }
+.example-prompt { white-space: pre-wrap; }
+.compare-modes { margin-bottom: 10px; }
+.compare-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.compare-pair figure { margin: 0; min-width: 0; }
+.compare-pair figure > div { width: 100%; background: #eee; }
+.compare-pair img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.compare-pair figcaption { margin-top: 6px; text-align: center; }
+.compare-slider { position: relative; width: 100%; max-height: 520px; background: #eee; }
+.compare-slider > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #eee; }
+.compare-divider { position: absolute; top: 0; bottom: 0; width: 2px; background: white; box-shadow: 0 0 2px black; }
+.compare-label { position: absolute; top: 8px; padding: 3px 6px; background: rgb(0 0 0 / 65%); color: #fff; font-size: 12px; }
+.compare-label-before { left: 8px; }
+.compare-label-after { right: 8px; }
+.compare-range { display: block; margin-top: 10px; }
+.compare-range input { width: 100%; display: block; }
+@media (max-width: 800px) {
+  .optimization-editor, .example-grid, .template-grid { grid-template-columns: 1fr; }
 }

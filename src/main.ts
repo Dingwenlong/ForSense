@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, protocol, net, clipboard, shell, Menu } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, protocol, net, clipboard, ClipboardItem, nativeImage, shell, Menu } from 'electron';
 import started from 'electron-squirrel-startup';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { Store, uuid } from './core/store';
 import { MediaService } from './core/service';
 import { messageOf } from './core/io';
+import { writeClipboardVerified } from './core/clipboard';
 import type { JobKind } from './shared/types';
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
@@ -49,6 +50,26 @@ if (ownsLock && !started) app.whenReady().then(async () => {
     } catch { return new Response('Not found', { status: 404 }); }
   });
   const approvedDirectories = new Set<string>();
+  register('library:list', () => store.library());
+  register('library:update', (id, patch) => store.updateAsset(uuid.parse(id), patch));
+  register('library:asset', async id => store.publicAsset(await store.asset(uuid.parse(id))));
+  register('library:video', id => store.publicSource(uuid.parse(id)));
+  register('clipboard:image', async id => {
+    const file = await store.assetPath(uuid.parse(id), 'image');
+    const image = nativeImage.createFromBuffer(await fs.readFile(file));
+    if (image.isEmpty()) throw new Error('图片无法复制，请重新导入后重试');
+    const bytes = new Uint8Array(image.toPNG());
+    await writeClipboardVerified(
+      () => clipboard.write([new ClipboardItem({ 'image/png': new Blob([bytes], { type: 'image/png' }) })]),
+      async () => {
+        const item = (await clipboard.read()).find(value => value.types.includes('image/png'));
+        if (!item) return false;
+        const blob = await item.getType('image/png');
+        if (!('arrayBuffer' in blob)) return false;
+        const copied = nativeImage.createFromBuffer(Buffer.from(await blob.arrayBuffer()));
+        return !copied.isEmpty() && copied.toBitmap().equals(image.toBitmap());
+      });
+  });
   register('drafts:list', () => store.list());
   register('drafts:create', platform => store.create(platform));
   register('drafts:save', draft => store.save(draft));
@@ -65,7 +86,10 @@ if (ownsLock && !started) app.whenReady().then(async () => {
     service.start(id, kind, payload);
   });
   register('jobs:cancel', id => service.cancel(id));
-  register('clipboard:write', value => clipboard.writeText(z.string().max(100000).parse(value)));
+  register('clipboard:write', async value => {
+    const text = z.string().max(100000).parse(value);
+    await writeClipboardVerified(() => clipboard.writeText(text), async () => await clipboard.readText() === text);
+  });
   register('shell:reveal', file => { if (!service.exported.has(file)) throw new Error('只能打开本次导出的素材位置'); shell.showItemInFolder(file); });
   register('help:open', async () => {
     const help = app.isPackaged ? path.join(process.resourcesPath, '使用说明.md') : path.join(app.getAppPath(), 'docs/使用说明.md');

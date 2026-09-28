@@ -32,9 +32,9 @@ export class MediaService {
   readonly exported = new Set<string>();
   constructor(readonly store: Store, readonly tools: Tools, private publish: (job: ExportJob) => void) {}
   start(id: string, kind: JobKind, payload: unknown) {
-    uuid.parse(id); z.enum(['images', 'video', 'frame', 'live', 'edit', 'export']).parse(kind);
+    uuid.parse(id); z.enum(['images', 'video', 'frame', 'live', 'edit', 'export', 'optimization']).parse(kind);
     if (this.jobs.has(id)) throw new Error('任务已存在');
-    const titles: Record<JobKind, string> = { images: '导入图片', video: '准备视频', frame: '截取画面', live: '制作实况', edit: '处理图片', export: '导出素材包' };
+    const titles: Record<JobKind, string> = { images: '导入图片', video: '准备视频', frame: '截取画面', live: '制作实况', edit: '处理图片', export: '导出素材包', optimization: '导入优化结果' };
     const entry = { info: { id, kind, title: titles[kind], status: 'queued', progress: 0, message: '等待处理' } as ExportJob, controller: new AbortController() };
     this.jobs.set(id, entry);
     this.publish({ ...entry.info });
@@ -60,6 +60,13 @@ export class MediaService {
   async execute(kind: JobKind, payload: unknown, signal: AbortSignal, report: Report): Promise<unknown> {
     switch (kind) {
       case 'images': return this.importImages(listPaths.parse(payload), signal, report);
+      case 'optimization': {
+        const p = z.object({ path: z.string().min(1).max(32767), sourceId: uuid, templateId: z.string().min(1).max(80), prompt: z.string().trim().min(1).max(10000) }).parse(payload);
+        const source = await this.store.asset(p.sourceId);
+        if (source.kind !== 'image') throw new Error('请选择静态图片作为优化原图');
+        const [result] = await this.importImages([p.path], signal, report, { sourceId: source.id, templateId: p.templateId, prompt: p.prompt, importedAt: new Date().toISOString() });
+        return result;
+      }
       case 'video': return this.importVideo(z.string().min(1).parse(payload), signal, report);
       case 'frame': { const p = z.object({ sourceId: uuid, time: z.number().nonnegative() }).parse(payload); return this.frame(p.sourceId, p.time, signal, report); }
       case 'live': { const p = z.object({ sourceId: uuid, start: z.number().nonnegative(), end: z.number().positive(), cover: z.number().nonnegative(), mute: z.boolean() }).parse(payload); return this.live(p, signal, report); }
@@ -73,7 +80,7 @@ export class MediaService {
     try { const record = await operation(id, directory); checkCancelled(signal); return await this.store.writeAsset(record); }
     catch (error) { await fs.rm(directory, { recursive: true, force: true }); throw error; }
   }
-  async importImages(paths: string[], signal: AbortSignal, report: Report) {
+  async importImages(paths: string[], signal: AbortSignal, report: Report, optimization?: AssetRecord['optimization']) {
     const result = [];
     try {
       for (const [n, file] of paths.entries()) {
@@ -84,7 +91,7 @@ export class MediaService {
           await fs.copyFile(file, path.join(dir, original));
           await transcode(this.tools, ['-i', path.join(dir, original), '-frames:v', '1', '-vf', 'setsar=1', '-update', '1', path.join(dir, 'image.png')], 0, signal, () => {});
           const p = await probe(this.tools, path.join(dir, 'image.png'), signal);
-          return { id, name: path.basename(file), kind: 'image', width: p.width, height: p.height, originalId: id, edits: { rotation: 0 }, imageFile: 'image.png' };
+          return { id, name: path.basename(file), kind: 'image', width: p.width, height: p.height, originalId: id, edits: { rotation: 0 }, imageFile: 'image.png', optimization };
         }, signal);
         result.push(item); report((n + 1) / paths.length, `已导入 ${n + 1} / ${paths.length} 张图片`);
       }
@@ -151,7 +158,7 @@ export class MediaService {
         await transcode(this.tools, ['-i', path.join(dir, videoFile), '-ss', (original.coverTime || 0).toFixed(6), '-frames:v', '1', '-q:v', '2', '-update', '1', path.join(dir, imageFile)], 0, signal, () => {});
       } else await transcode(this.tools, ['-i', await this.store.assetPath(original.id, 'image'), '-vf', filter.join(','), '-frames:v', '1', '-update', '1', path.join(dir, imageFile)], 0, signal, () => {});
       const meta = await probe(this.tools, path.join(dir, imageFile), signal);
-      return { ...original, id, originalId: original.id, edits, width: meta.width, height: meta.height, imageFile, videoFile };
+      return { ...original, id, originalId: original.id, edits, width: meta.width, height: meta.height, imageFile, videoFile, createdAt: new Date().toISOString(), archived: false };
     }, signal);
   }
   async export(options: { draftId: string; directory: string; format: 'folder' | 'zip'; targets: ('apple' | 'android')[] }, signal: AbortSignal, report: Report) {

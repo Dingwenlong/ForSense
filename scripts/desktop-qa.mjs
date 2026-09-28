@@ -11,7 +11,7 @@ const work = await mkdtemp(path.join(os.tmpdir(), 'social-copy-desktop-qa-'));
 const output = path.join(root, 'output/playwright'); await mkdir(output, { recursive: true });
 const ffmpeg = path.join(root, 'resources/media/ffmpeg.exe');
 const assertions = [], errors = [];
-let application, page;
+let application, page, clipboardAvailable = false;
 const record = message => { assertions.push(message); console.log('PASS', message); };
 const waitFor = async callback => { const start = Date.now(); while (Date.now() - start < 60000) { if (await callback()) return; await new Promise(resolve => setTimeout(resolve, 150)); } throw new Error('Timed out waiting for application condition'); };
 const env = { ...process.env, SOCIAL_COPY_DATA_DIRECTORY: path.join(work, 'profile') };
@@ -23,11 +23,15 @@ async function launch() {
   page = await application.firstWindow(); page.setDefaultTimeout(15000);
   page.on('pageerror', error => errors.push(error.message));
   await page.getByRole('heading', { name: '我的草稿', exact: true }).waitFor();
+  clipboardAvailable = await application.evaluate(async ({ clipboard }) => {
+    try { await clipboard.writeText('social-copy-clipboard-check'); return await clipboard.readText() === 'social-copy-clipboard-check'; } catch { return false; }
+  });
 }
 async function selectFiles(paths) {
   await application.evaluate(({ dialog }, files) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: files }); }, paths);
 }
 const photos = () => page.locator('.wechat-proof__photo');
+const dismissNotice = async () => { const button = page.getByRole('button', { name: '关闭提示', exact: true }); if (await button.count()) await button.click(); };
 
 try {
   const images = [];
@@ -57,13 +61,19 @@ try {
   const caption = '把时间留给风，把心情留给海。\n\n走走停停，收集一些简单的快乐。🌊\n#周末日常 #慢生活';
   await page.getByRole('textbox', { name: '发布文案', exact: true }).fill(caption);
   await page.getByRole('button', { name: '复制文案', exact: true }).click();
-  await page.getByText('文案已复制，可粘贴到发布页面', { exact: true }).waitFor();
-  assert.equal(await application.evaluate(({ clipboard }) => clipboard.readText()), caption);
+  if (clipboardAvailable) {
+    await page.getByText('文案已复制，可粘贴到发布页面', { exact: true }).waitFor();
+    assert.equal(await application.evaluate(({ clipboard }) => clipboard.readText()), caption);
+  } else {
+    await page.getByRole('alert').filter({ hasText: '系统剪贴板暂不可用' }).waitFor();
+    await dismissNotice();
+  }
   await page.screenshot({ path: path.join(output, '03-wechat-caption.png') });
-  record('Typing directly in the WeChat preview saves caption and supports copying');
+  record(clipboardAvailable ? 'WeChat caption saves and copies to the OS clipboard' : 'WeChat caption saves; inaccessible OS clipboard reports failure instead of success');
 
   await selectFiles(images.slice(0, 3));
   await page.locator('.wechat-proof__add').click();
+  await page.getByRole('dialog', { name: '添加图片', exact: true }).getByRole('button', { name: '从电脑导入图片', exact: true }).click();
   await waitFor(async () => await photos().count() === 3);
   assert.equal(await page.locator('.wechat-proof__add').count(), 1);
   const first = await photos().first().locator('img').getAttribute('src');
@@ -93,6 +103,7 @@ try {
   assert.equal(await page.locator('.layout-caption').innerText(), douyinCaption);
   await selectFiles([images[3]]);
   await page.locator('.douyin-proof__add').click();
+  await page.getByRole('dialog', { name: '添加图片', exact: true }).getByRole('button', { name: '从电脑导入图片', exact: true }).click();
   await waitFor(async () => await page.locator('.image-counter').innerText() === '1/4');
   await page.getByRole('button', { name: '下一张', exact: true }).click();
   const movingImage = await page.locator('.douyin-proof__image img').getAttribute('src');
@@ -204,13 +215,119 @@ try {
   assert.equal(JSON.parse(await readFile(path.join(textOnlyFolder, '素材清单.json'), 'utf8')).items.length, 0);
   record('Text-only Douyin draft can be edited and exported directly in preview');
 
+  await page.getByRole('button', { name: '关闭窗口', exact: true }).click();
+  await dismissNotice();
+  await page.getByRole('navigation', { name: '工作区导航' }).getByRole('button', { name: '全局素材库', exact: true }).click();
+  await page.getByRole('heading', { name: '全局素材库', exact: true }).waitFor();
+  await waitFor(async () => await page.locator('.material-card').count() >= 7);
+  await page.getByRole('combobox', { name: '素材分类', exact: true }).selectOption('video');
+  await page.getByRole('button', { name: '打开视频取材', exact: true }).click();
+  await page.locator('.video-source-label').filter({ hasText: '短视频.mp4' }).waitFor();
+  await page.getByRole('button', { name: '截取并保存到素材库', exact: true }).click();
+  await page.getByText('素材已保存到全局素材库', { exact: true }).waitFor();
+  await page.getByRole('button', { name: '返回素材库', exact: true }).click();
+  await dismissNotice();
+  record('Global library includes existing images, Live Photos and reusable imported videos');
+
+  await page.getByRole('combobox', { name: '素材分类', exact: true }).selectOption('all');
+  await selectFiles([path.join(root, 'public/ai-examples/product-before.png')]);
+  await page.getByRole('button', { name: '从电脑导入图片', exact: true }).click();
+  await page.getByRole('searchbox', { name: '搜索素材', exact: true }).fill('product-before');
+  await page.getByRole('button', { name: '查看素材 product-before.png', exact: true }).click();
+  await page.getByRole('textbox', { name: '素材名称', exact: true }).fill('案例原图');
+  await page.getByRole('button', { name: '保存名称', exact: true }).click();
+  await page.getByRole('searchbox', { name: '搜索素材', exact: true }).fill('案例原图');
+  await page.locator('.material-card').getByRole('button', { name: '收藏', exact: true }).click();
+  await page.getByRole('button', { name: '归档素材', exact: true }).click();
+  await waitFor(async () => await page.locator('.material-card').count() === 0);
+  await page.getByRole('combobox', { name: '素材分类', exact: true }).selectOption('archived');
+  assert.equal(await page.locator('.material-card').count(), 1);
+  await page.getByRole('button', { name: '恢复到素材库', exact: true }).click();
+  await page.getByRole('button', { name: '恢复到素材库', exact: true }).waitFor({ state: 'hidden' });
+  await page.getByRole('combobox', { name: '素材分类', exact: true }).selectOption('favorites');
+  assert.equal(await page.locator('.material-card').count(), 1);
+  await page.getByRole('button', { name: '收起详情', exact: true }).click();
+  await dismissNotice();
+  await page.screenshot({ path: path.join(output, '08-global-library.png') });
+  record('Global material import, search, rename, favorite, archive and restore work');
+
+  await page.getByRole('button', { name: '查看素材 案例原图', exact: true }).click();
+  await page.getByRole('region', { name: '素材详情', exact: true }).getByRole('button', { name: 'AI 图片优化', exact: true }).click();
+  await page.getByRole('heading', { name: '选择一种优化方向', exact: true }).waitFor();
+  assert.equal(await page.locator('.template-option').count(), 20);
+  await page.getByRole('button', { name: '商品柔光 商品 · 让材质、轮廓和背景更干净。', exact: true }).click();
+  await page.getByRole('button', { name: '复制原图', exact: true }).click();
+  if (clipboardAvailable) {
+    await page.getByText('图片已复制，请先粘贴到外部工具，再复制提示词', { exact: true }).waitFor();
+    const clipboardImage = await application.evaluate(async ({ clipboard, nativeImage }) => {
+      const items = await clipboard.read(); const item = items.find(value => value.types.includes('image/png'));
+      if (!item) return null; const blob = await item.getType('image/png');
+      return nativeImage.createFromBuffer(Buffer.from(await blob.arrayBuffer())).getSize();
+    });
+    assert.ok(clipboardImage?.width > 1000 && clipboardImage.height > 1000);
+  } else await page.getByRole('alert').filter({ hasText: '系统剪贴板暂不可用' }).waitFor();
+  await dismissNotice();
+  const prompt = await page.getByRole('textbox', { name: '优化提示词', exact: true }).inputValue();
+  await page.getByRole('textbox', { name: '优化提示词', exact: true }).fill(prompt + '\n自定义：保留完整杯柄。');
+  await page.getByRole('button', { name: '复制提示词', exact: true }).click();
+  if (clipboardAvailable) {
+    await page.getByText('提示词已复制', { exact: true }).waitFor();
+    assert.equal(await application.evaluate(({ clipboard }) => clipboard.readText()), prompt + '\n自定义：保留完整杯柄。');
+  } else await page.getByRole('alert').filter({ hasText: '系统剪贴板暂不可用' }).waitFor();
+  await dismissNotice();
+  await page.screenshot({ path: path.join(output, '09-ai-copy-workflow.png') });
+  record(clipboardAvailable ? '20 editable templates; image and prompt copied to OS clipboard' : '20 editable templates; image and prompt copy report inaccessible clipboard with retry');
+
+  await page.getByRole('button', { name: '前后对比案例', exact: true }).click();
+  await waitFor(async () => await page.locator('.optimization-example img').evaluateAll(imgs => imgs.length === 4 && imgs.every(img => img.complete && img.naturalWidth > 0)));
+  await page.screenshot({ path: path.join(output, '10-ai-examples.png') });
+  await page.locator('.optimization-example').first().getByRole('button', { name: '滑动对比', exact: true }).click();
+  const range = page.getByRole('slider', { name: '商品案例对比位置', exact: true });
+  await range.fill('25'); assert.equal(await range.inputValue(), '25');
+  await range.focus(); await page.keyboard.press('ArrowRight'); assert.equal(await range.inputValue(), '26');
+  await page.getByRole('button', { name: '优化图片', exact: true }).click();
+  await selectFiles([path.join(root, 'public/ai-examples/product-after.png')]);
+  await page.getByRole('button', { name: '导入优化结果', exact: true }).click();
+  await page.getByRole('button', { name: '复制优化图', exact: true }).waitFor();
+  await dismissNotice();
+  await page.locator('.optimization-result').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: path.join(output, '11-ai-result.png') });
+  await page.getByRole('button', { name: '将结果加入当前草稿', exact: true }).click();
+  await page.getByRole('heading', { name: '实时预览', exact: true }).waitFor();
+  assert.equal(await page.locator('.image-counter').innerText(), '1/1');
+  const manualResult = (await page.evaluate(() => window.desktop.listLibrary())).assets.find(a => a.optimization);
+  assert.equal(manualResult.optimization.prompt, prompt + '\n自定义：保留完整杯柄。');
+  record('Bundled examples render offline and manual results preserve provenance, compare and enter a draft');
+
+  await dismissNotice();
+  await page.locator('.douyin-proof__add').click();
+  const picker = page.getByRole('dialog', { name: '添加图片', exact: true });
+  await picker.getByRole('searchbox', { name: '搜索素材', exact: true }).fill('案例原图');
+  await picker.getByRole('checkbox', { name: '选择 案例原图', exact: true }).check();
+  await picker.getByRole('button', { name: '加入当前草稿', exact: true }).click();
+  assert.equal(await page.locator('.image-counter').innerText(), '1/2');
+  await dismissNotice();
+  await page.locator('.douyin-proof__add').click();
+  await picker.getByRole('searchbox', { name: '搜索素材', exact: true }).fill('案例原图');
+  assert.equal(await picker.getByRole('checkbox', { name: '选择 案例原图', exact: true }).isDisabled(), true);
+  await picker.getByRole('button', { name: '关闭窗口', exact: true }).click();
+  await application.close(); application = null;
+  await launch();
+  await page.getByRole('navigation', { name: '工作区导航' }).getByRole('button', { name: '全局素材库', exact: true }).click();
+  await page.getByRole('combobox', { name: '素材分类', exact: true }).selectOption('ai');
+  await page.getByRole('button', { name: '查看素材 product-after.png', exact: true }).click();
+  await page.getByRole('region', { name: '素材详情', exact: true }).getByRole('button', { name: 'AI 图片优化', exact: true }).click();
+  assert.equal(await page.getByRole('textbox', { name: '优化提示词', exact: true }).inputValue(), prompt + '\n自定义：保留完整杯柄。');
+  assert.equal(await page.locator('.optimization-result img').count(), 2);
+  record('Preview + reuses library assets without duplicates; comparison and prompt survive restart');
+
   const boundary = await page.evaluate(async () => {
     try { await window.desktop.startJob(crypto.randomUUID(), 'export', { directory: 'C:/', draftId: crypto.randomUUID(), format: 'folder', targets: [] }); return false; }
     catch { return true; }
   });
   assert.equal(boundary, true); assert.deepEqual(errors, []);
   record('Export path boundary and renderer runtime remain sound');
-  await writeFile(path.join(output, 'qa-results.json'), JSON.stringify({ passed: true, assertions, rendererErrors: errors, nativeDeviceTests: 'not performed', cleanVirtualMachine: 'not performed; packaged executable tested with restricted child PATH' }, null, 2));
+  await writeFile(path.join(output, 'qa-results.json'), JSON.stringify({ passed: true, assertions, rendererErrors: errors, clipboardReadback: clipboardAvailable ? 'passed' : 'unavailable in this Windows test session; failure reporting verified; successful native paste requires interactive-session verification', nativeDeviceTests: 'not performed', cleanVirtualMachine: 'not performed; packaged executable tested with restricted child PATH' }, null, 2));
 } catch (error) {
   if (page) { try { await page.screenshot({ path: path.join(output, 'failure.png') }); await writeFile(path.join(output, 'failure-dom.txt'), await page.locator('body').innerText()); } catch {} }
   throw error;

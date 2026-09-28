@@ -2,7 +2,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import type { Draft, Edits, MediaAsset, Platform, VideoSource } from '../shared/types';
+import type { Draft, Edits, MediaAsset, Platform, VideoSource, LibrarySnapshot } from '../shared/types';
 import { atomicJSON, inside } from './io';
 
 export const uuid = z.string().uuid();
@@ -14,6 +14,7 @@ export const draftInput = z.object({ version: z.literal(1), id: uuid, title: z.s
 export interface AssetRecord {
   id: string; kind: 'image' | 'live'; name: string; width: number; height: number;
   originalId: string; edits: Edits; imageFile: string; videoFile?: string; duration?: number; coverTime?: number;
+  createdAt?: string; favorite?: boolean; archived?: boolean; optimization?: MediaAsset['optimization'];
 }
 export interface SourceRecord { id: string; name: string; videoFile: string; duration: number; width: number; height: number; frames: number[]; hasAudio: boolean }
 
@@ -33,8 +34,46 @@ export class Store {
     const { imageFile, videoFile, ...asset } = record;
     return { ...asset, imageUrl: `media://asset/${record.id}/image`, videoUrl: videoFile ? `media://asset/${record.id}/video` : undefined };
   }
-  async writeAsset(record: AssetRecord) { await atomicJSON(path.join(this.directory('assets', record.id), 'asset.json'), record); return this.publicAsset(record); }
+  async writeAsset(record: AssetRecord) {
+    record = { ...record, createdAt: record.createdAt || new Date().toISOString() };
+    await atomicJSON(path.join(this.directory('assets', record.id), 'asset.json'), record); return this.publicAsset(record);
+  }
+  async updateAsset(id: string, input: unknown) {
+    uuid.parse(id);
+    const patch = z.object({ name: z.string().trim().min(1).max(240).optional(), favorite: z.boolean().optional(), archived: z.boolean().optional() }).strict().parse(input);
+    const key = `asset:${id}`, previous = this.writes.get(key) || Promise.resolve();
+    const write = previous.catch(() => {}).then(async () => {
+      const record = await this.asset(id);
+      const createdAt = record.createdAt || (await fs.stat(path.join(this.directory('assets', id), 'asset.json'))).birthtime.toISOString();
+      return this.writeAsset({ ...record, ...patch, createdAt });
+    });
+    this.writes.set(key, write);
+    try { return await write; } finally { if (this.writes.get(key) === write) this.writes.delete(key); }
+  }
+  async library(): Promise<LibrarySnapshot> {
+    const { drafts, warnings } = await this.list();
+    const assets: LibrarySnapshot['assets'] = [], videos: LibrarySnapshot['videos'] = [];
+    for (const entry of await fs.readdir(inside(this.root, 'assets'), { withFileTypes: true })) {
+      if (!entry.isDirectory() || !uuid.safeParse(entry.name).success) continue;
+      try {
+        const record = await this.asset(entry.name);
+        const createdAt = record.createdAt || (await fs.stat(path.join(this.directory('assets', entry.name), 'asset.json'))).birthtime.toISOString();
+        assets.push({ ...this.publicAsset(record), createdAt, usedBy: drafts.filter(d => d.items.some(i => i.id === record.id)).map(d => d.title) });
+      } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') warnings.push('一份素材记录无法读取，文件仍保留。'); }
+    }
+    for (const entry of await fs.readdir(inside(this.root, 'sources'), { withFileTypes: true })) {
+      if (!entry.isDirectory() || !uuid.safeParse(entry.name).success) continue;
+      try { const { frames, ...video } = await this.publicSource(entry.name); videos.push(video); }
+      catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') warnings.push('一份视频记录无法读取，文件仍保留。'); }
+    }
+    assets.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+    return { assets, videos, warnings };
+  }
   async source(id: string): Promise<SourceRecord> { return JSON.parse(await fs.readFile(path.join(this.directory('sources', id), 'source.json'), 'utf8')); }
+  async publicSource(id: string): Promise<VideoSource> {
+    const { videoFile, ...source } = await this.source(id);
+    return { ...source, videoUrl: `media://source/${id}/video` };
+  }
   async writeSource(source: SourceRecord): Promise<VideoSource> {
     await atomicJSON(path.join(this.directory('sources', source.id), 'source.json'), source);
     const { videoFile, ...result } = source;

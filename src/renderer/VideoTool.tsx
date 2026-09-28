@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import type { MediaAsset, VideoSource, JobKind } from '../shared/types';
 import { Modal } from './Modal';
 import { timeLabel } from './hooks';
-export function VideoTool({ source, setSource, busy, run, perform, add, close }: {
+export function VideoTool({ source, setSource, busy, run, perform, add, close, toLibrary = false }: {
   source: VideoSource | null; setSource: (s: VideoSource) => void; busy: boolean;
   run: <T>(kind: JobKind, payload: unknown) => Promise<T>; perform: (action: () => Promise<void>) => void;
   add: (asset: MediaAsset) => void; close: () => void;
+  toLibrary?: boolean;
 }) {
   const [mode, setMode] = useState<'frame' | 'live'>('frame'), [time, setTime] = useState(0), [start, setStart] = useState(0), [end, setEnd] = useState(3), [cover, setCover] = useState(1.5), [mute, setMute] = useState(false), [added, setAdded] = useState(0);
   const video = useRef<HTMLVideoElement>(null), playingClip = useRef(false);
@@ -36,15 +37,15 @@ export function VideoTool({ source, setSource, busy, run, perform, add, close }:
       <div className="timeline"><input aria-label="视频时间轴" type="range" min="0" max={lastFrame || 1} step="0.001" value={Math.min(time, lastFrame)} disabled={!source || busy} onChange={e => seek(Number(e.target.value))}/><div className="timeline-labels"><span>{timeLabel(time)}</span><span>{timeLabel(source?.duration || 0)}</span></div></div>
       <div className="controls"><button disabled={!source || busy} onClick={() => step(-1)}>上一帧</button><span>精确选择画面</span><button disabled={!source || busy} onClick={() => step(1)}>下一帧</button></div>
     </section><aside className="video-options"><div className="controls"><button aria-pressed={mode === 'frame'} onClick={() => setMode('frame')}>截取图片</button><button aria-pressed={mode === 'live'} onClick={() => setMode('live')}>制作实况</button></div>
-      {mode === 'frame' ? <div className="video-mode-content"><h3>截取当前画面</h3><p>拖动时间轴找到画面，用逐帧按钮微调。截图会直接加入当前草稿。</p><p>当前画面：<strong>{timeLabel(time)}</strong></p><p>画面尺寸：<strong>{source ? `${source.width} × ${source.height}` : '—'}</strong></p><button disabled={!source || busy} onClick={take}>截取并加入草稿</button></div>
+      {mode === 'frame' ? <div className="video-mode-content"><h3>截取当前画面</h3><p>拖动时间轴找到画面，用逐帧按钮微调。截图会保存到{toLibrary ? '全局素材库' : '当前草稿和全局素材库'}。</p><p>当前画面：<strong>{timeLabel(time)}</strong></p><p>画面尺寸：<strong>{source ? `${source.width} × ${source.height}` : '—'}</strong></p><button disabled={!source || busy} onClick={take}>{toLibrary ? '截取并保存到素材库' : '截取并加入草稿'}</button></div>
         : <div className="video-mode-content"><p>片段最长 3 秒，可设置封面和声音。</p><label className="field-label">开始时间（秒）<input type="number" aria-label="实况开始时间" min="0" max={Math.max(0, (source?.duration || 0) - 0.04)} step="0.01" value={start.toFixed(2)} disabled={!source || busy} onChange={e => changeRange(Number(e.target.value), Number(e.target.value) + end - start)}/></label><label className="field-label">结束时间（秒）<input type="number" aria-label="实况结束时间" min={start + 0.04} max={Math.min(source?.duration || 3, start + 3)} step="0.01" value={end.toFixed(2)} disabled={!source || busy} onChange={e => changeRange(start, Number(e.target.value))}/></label>
           <button disabled={!source || busy} onClick={() => changeRange(time, Math.min(source!.duration, time + 3))}>从当前画面开始</button>
           <label className="field-label">封面位置 · {timeLabel(cover)}<input aria-label="实况封面时间" type="range" min={start} max={Math.max(start, end - 0.034)} step="0.001" value={cover} disabled={!source || busy} onChange={e => { const value = Number(e.target.value); setCover(value); seek(value); }}/></label>
           <label className="checkbox-label"><input type="checkbox" checked={!mute} onChange={e => setMute(!e.target.checked)} disabled={busy || !source?.hasAudio}/>{source?.hasAudio ? '保留原声' : '原视频没有声音'}</label>
           <button disabled={!source || busy} onClick={() => { if (!video.current) return; video.current.currentTime = start; playingClip.current = true; void video.current.play(); }}>预览 {(end - start).toFixed(2)} 秒片段</button>
-          <button disabled={!source || busy || end <= start} onClick={makeLive}>制作并加入草稿</button>
+          <button disabled={!source || busy || end <= start} onClick={makeLive}>{toLibrary ? '制作并保存到素材库' : '制作并加入草稿'}</button>
           <p>导出时选择 iPhone 或标准安卓格式。手机相册兼容性待真机验证。</p>
         </div>}
-    </aside></div><footer className="modal-footer"><span>{added ? `已加入 ${added} 个素材，可继续取材` : '视频在本机处理，原始文件保留'}</span><button disabled={busy} onClick={close}>返回图文</button></footer>
+    </aside></div><footer className="modal-footer"><span>{added ? `已加入 ${added} 个素材，可继续取材` : '视频在本机处理，原始文件保留'}</span><button disabled={busy} onClick={close}>{toLibrary ? '返回素材库' : '返回图文'}</button></footer>
   </Modal>;
 }

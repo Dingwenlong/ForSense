@@ -1,0 +1,61 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { promises as fs } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import path from 'node:path';
+import os from 'node:os';
+import { Store } from '../src/core/store';
+import { MediaService } from '../src/core/service';
+import { runProcess } from '../src/core/process';
+import type { MediaAsset } from '../src/shared/types';
+
+const tools = { ffmpeg: path.resolve('resources/media/ffmpeg.exe'), ffprobe: path.resolve('resources/media/ffprobe.exe') };
+test('global library preserves shared drafts, migrates old records and retains manual optimization provenance', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'social-copy-library-'));
+  const signal = new AbortController().signal, report = () => {};
+  try {
+    const store = new Store(path.join(root, '资料库')); await store.init();
+    const service = new MediaService(store, tools, () => {});
+    const file = path.join(root, '中文原图.png');
+    await runProcess(tools.ffmpeg, ['-v', 'error', '-f', 'lavfi', '-i', 'color=blue:size=120x80', '-frames:v', '1', '-update', '1', file], signal);
+    const [original] = await service.execute('images', [file], signal, report) as MediaAsset[];
+    const originalBytes = await fs.readFile(await store.assetPath(original.id, 'image'));
+    const oldRecord = await store.asset(original.id); delete oldRecord.createdAt;
+    await fs.writeFile(path.join(store.directory('assets', original.id), 'asset.json'), JSON.stringify(oldRecord));
+    const first = await store.create('moments'), second = await store.create('douyin');
+    await store.save({ ...first, items: [original] }); await store.save({ ...second, items: [original] });
+    assert.equal((await store.library()).assets[0].usedBy.length, 2);
+    assert.ok((await store.library()).assets[0].createdAt);
+    await Promise.all([store.updateAsset(original.id, { favorite: true }), store.updateAsset(original.id, { name: '共享素材', archived: true })]);
+    const restarted = new Store(store.root); await restarted.init();
+    const archived = (await restarted.library()).assets[0];
+    assert.equal(archived.favorite, true); assert.equal(archived.archived, true); assert.equal(archived.name, '共享素材');
+    assert.equal((await restarted.load(first.id)).items[0].id, original.id);
+    await restarted.remove(first.id);
+    assert.equal((await restarted.library()).assets[0].usedBy.length, 1);
+    assert.deepEqual(await fs.readFile(await restarted.assetPath(original.id, 'image')), originalBytes);
+    await restarted.updateAsset(original.id, { archived: false });
+    await assert.rejects(store.updateAsset(original.id, { imageFile: '../../external.png' }));
+    await assert.rejects(store.updateAsset('../external', { name: 'x' }));
+
+    const resultFile = path.join(root, '手动优化.png');
+    await runProcess(tools.ffmpeg, ['-v', 'error', '-f', 'lavfi', '-i', 'color=yellow:size=160x100', '-frames:v', '1', '-update', '1', resultFile], signal);
+    const result = await service.execute('optimization', { sourceId: original.id, path: resultFile, templateId: 'natural', prompt: '自然提亮，保留原图。🌤' }, signal, report) as MediaAsset;
+    assert.notEqual(result.id, original.id); assert.equal(result.originalId, result.id);
+    assert.equal(result.width, 160); assert.equal(result.optimization?.sourceId, original.id);
+    assert.equal(result.optimization?.prompt, '自然提亮，保留原图。🌤');
+    assert.equal((await new Store(store.root).asset(result.id)).optimization?.templateId, 'natural');
+    assert.deepEqual(await fs.readFile(await store.assetPath(original.id, 'image')), originalBytes);
+    const cropped = await service.execute('edit', { id: result.id, edits: { rotation: 90 } }, signal, report) as MediaAsset;
+    assert.equal(cropped.originalId, result.id); assert.equal(cropped.width, 100);
+    assert.equal(cropped.optimization?.sourceId, original.id);
+    const beforeFailure = await fs.readdir(path.join(store.root, 'assets'));
+    const broken = path.join(root, '坏结果.png'); await fs.writeFile(broken, 'invalid image');
+    await assert.rejects(service.execute('optimization', { sourceId: original.id, path: broken, templateId: 'natural', prompt: '提亮' }, signal, report));
+    const abort = new AbortController(); abort.abort();
+    await assert.rejects(service.execute('optimization', { sourceId: original.id, path: resultFile, templateId: 'natural', prompt: '提亮' }, abort.signal, report), /取消/);
+    await assert.rejects(service.execute('optimization', { sourceId: randomUUID(), path: resultFile, templateId: 'natural', prompt: '提亮' }, signal, report));
+    assert.deepEqual(await fs.readdir(path.join(store.root, 'assets')), beforeFailure);
+    assert.deepEqual(await fs.readFile(await store.assetPath(original.id, 'image')), originalBytes);
+  } finally { await fs.rm(root, { recursive: true, force: true }); }
+});

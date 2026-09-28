@@ -1,6 +1,11 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { DesktopAPI, ExportJob } from './shared/types';
 const api: DesktopAPI = {
+  listLibrary: () => ipcRenderer.invoke('library:list'),
+  updateAsset: (id, patch) => ipcRenderer.invoke('library:update', id, patch),
+  getAsset: id => ipcRenderer.invoke('library:asset', id),
+  getVideo: id => ipcRenderer.invoke('library:video', id),
+  copyImage: id => ipcRenderer.invoke('clipboard:image', id),
   listDrafts: () => ipcRenderer.invoke('drafts:list'),
   createDraft: platform => ipcRenderer.invoke('drafts:create', platform),
   saveDraft: draft => ipcRenderer.invoke('drafts:save', draft),

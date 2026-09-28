@@ -8,7 +8,7 @@ const config: ForgeConfig = {
     asar: true,
     executableName: 'SocialCopyStudio',
     icon: 'resources/icon',
-    extraResource: ['resources/media', 'resources/licenses', 'resources/icon.ico', 'docs/使用说明.md'],
+    extraResource: ['resources/media', 'resources/licenses', 'resources/icon.ico', 'docs/使用说明.md', 'docs/AI模板与案例.md'],
     win32metadata: { FileDescription: '片语 · 图文工作台', ProductName: '片语', CompanyName: 'Social Copy Studio' },
   },
   makers: [new MakerSquirrel({ name: 'SocialCopyStudio', setupExe: 'SocialCopyStudio-Setup.exe', setupIcon: 'resources/icon.ico', noMsi: true }), new MakerZIP({}, ['win32'])],

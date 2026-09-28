@@ -1,9 +1,9 @@
 import type { Draft, MediaAsset } from '../shared/types';
 import { Preview } from './Preview';
 
-export function WorkbenchPage({ draft, busy, change, importFiles, openVideo, reorder, edit, duplicate, remove, rejectVideoDrop, copy, exportPackage }: {
+export function WorkbenchPage({ draft, busy, change, importFiles, addImages, openVideo, reorder, edit, duplicate, remove, rejectVideoDrop, copy, exportPackage }: {
   draft: Draft; busy: boolean; change: (patch: Partial<Draft>) => void;
-  importFiles: (paths?: string[]) => void; openVideo: () => void; reorder: (from: number, to: number) => void;
+  importFiles: (paths?: string[]) => void; addImages: () => void; openVideo: () => void; reorder: (from: number, to: number) => void;
   edit: (asset: MediaAsset) => void; duplicate: () => void; remove: () => void;
   rejectVideoDrop: () => void; copy: () => void; exportPackage: () => void;
 }) {
@@ -38,7 +38,7 @@ export function WorkbenchPage({ draft, busy, change, importFiles, openVideo, reo
     <div className="workbench-preview" aria-label="实时预览">
       <div className="workbench-preview-head"><h1>实时预览</h1><span>{draft.items.length} 张图片 · {Array.from(draft.caption).length} 字</span></div>
       <div className="workbench-preview-scroll"><Preview draft={draft} busy={busy} onEdit={edit} onReorder={reorder}
-        onAddImages={() => importFiles()} onCaptionChange={caption => change({ caption })}/></div>
+        onAddImages={addImages} onCaptionChange={caption => change({ caption })}/></div>
     </div>
   </section>;
 }

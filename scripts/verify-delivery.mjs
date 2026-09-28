@@ -6,6 +6,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 const require = createRequire(import.meta.url);
 const yauzl = require('yauzl');
+const asar = require('@electron/asar');
 const root = path.resolve(import.meta.dirname, '..');
 const pkg = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
 const hashFile = async (file, algorithm = 'sha256') => { const hash = createHash(algorithm); for await (const block of createReadStream(file)) hash.update(block); return hash.digest('hex'); };
@@ -20,7 +21,7 @@ assert.equal(header.toString(), 'MZ');
 const releases = (await readFile(path.join(installerDir, 'RELEASES'), 'utf8')).trim().split(/\s+/);
 assert.equal(releases[0].toLowerCase(), await hashFile(nupkg, 'sha1'));
 assert.equal(Number(releases[2]), (await stat(nupkg)).size);
-const needed = ['SocialCopyStudio.exe', 'resources/app.asar', 'resources/media/ffmpeg.exe', 'resources/media/ffprobe.exe', 'resources/licenses/FFmpeg-COPYING.txt', 'resources/licenses/THIRD_PARTY_NOTICES.md', 'resources/使用说明.md'];
+const needed = ['SocialCopyStudio.exe', 'resources/app.asar', 'resources/media/ffmpeg.exe', 'resources/media/ffprobe.exe', 'resources/licenses/FFmpeg-COPYING.txt', 'resources/licenses/THIRD_PARTY_NOTICES.md', 'resources/使用说明.md', 'resources/AI模板与案例.md'];
 const packaged = path.join(root, 'out/SocialCopyStudio-win32-x64');
 const checked = [];
 await new Promise((resolve, reject) => {
@@ -43,6 +44,10 @@ await new Promise((resolve, reject) => {
   });
 });
 assert.deepEqual(checked.sort(), needed.sort());
+const exampleFiles = ['product-before.png', 'product-after.png', 'food-before.png', 'food-after.png'];
+for (const file of exampleFiles) assert.deepEqual(
+  asar.extractFile(path.join(packaged, 'resources/app.asar'), path.join('.vite', 'renderer', 'main_window', 'ai-examples', file)),
+  await readFile(path.join(root, 'public/ai-examples', file)));
 const output = path.join(root, 'output/verification'); await mkdir(output, { recursive: true });
-await writeFile(path.join(output, 'delivery-checks.json'), JSON.stringify({ version: pkg.version, records, verifiedPortableEntries: checked, squirrelReleaseHashVerified: true }, null, 2));
-console.log(JSON.stringify({ version: pkg.version, files: records.map(r => ({ name: path.basename(r.file), MB: Math.round(r.bytes / 1048576) })), verifiedPortableEntries: checked.length, squirrelReleaseHashVerified: true }, null, 2));
+await writeFile(path.join(output, 'delivery-checks.json'), JSON.stringify({ version: pkg.version, records, verifiedPortableEntries: checked, verifiedExampleFiles: exampleFiles, squirrelReleaseHashVerified: true }, null, 2));
+console.log(JSON.stringify({ version: pkg.version, files: records.map(r => ({ name: path.basename(r.file), MB: Math.round(r.bytes / 1048576) })), verifiedPortableEntries: checked.length, verifiedExampleFiles: exampleFiles.length, squirrelReleaseHashVerified: true }, null, 2));

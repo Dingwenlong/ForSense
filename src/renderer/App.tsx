@@ -6,9 +6,13 @@ import { CropEditor } from './CropEditor';
 import { VideoTool } from './VideoTool';
 import { LibraryPage } from './pages';
 import { WorkbenchPage } from './WorkbenchPage';
+import { AssetBrowser } from './AssetBrowser';
+import { OptimizationPage, emptyOptimizationSession, type OptimizationSession } from './OptimizationPage';
 
 export function App() {
-  const [drafts, setDrafts] = useState<Draft[]>([]), [draft, setDraft] = useState<Draft | null>(null), [page, setPage] = useState<'library' | 'workbench'>('library'), [filter, setFilter] = useState<'all' | 'moments' | 'douyin'>('all'), [query, setQuery] = useState('');
+  const [drafts, setDrafts] = useState<Draft[]>([]), [draft, setDraft] = useState<Draft | null>(null), [page, setPage] = useState<'library' | 'workbench' | 'assets' | 'optimization'>('library'), [filter, setFilter] = useState<'all' | 'moments' | 'douyin'>('all'), [query, setQuery] = useState('');
+  const [libraryRevision, setLibraryRevision] = useState(0), [assetPicker, setAssetPicker] = useState<'draft' | 'ai' | null>(null);
+  const [optimization, setOptimization] = useState<OptimizationSession>(emptyOptimizationSession);
   const [busy, setBusy] = useState(false), [loading, setLoading] = useState(true), [saveStatus, setSaveStatus] = useState('已保存');
   const [notice, setNotice] = useState<{ text: string; error?: boolean; retry?: () => void } | null>(null);
   const [cropAsset, setCropAsset] = useState<MediaAsset | null>(null), [videoOpen, setVideoOpen] = useState(false), [videoSource, setVideoSource] = useState<VideoSource | null>(null);
@@ -16,8 +20,11 @@ export function App() {
   const [exportResult, setExportResult] = useState<string | null>(null), [about, setAbout] = useState(false), [deleteConfirm, setDeleteConfirm] = useState(false);
   const [info, setInfo] = useState<{ version: string; dataDirectory: string; compatibility: string } | null>(null);
   const draftRef = useRef<Draft | null>(null), timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined), revision = useRef(0), dirty = useRef(false), saveQueue = useRef<Promise<unknown>>(Promise.resolve());
+  const pageBody = useRef<HTMLElement>(null);
+  useEffect(() => { pageBody.current?.scrollTo(0, 0); }, [page]);
   const { run, job, processing, cancel } = useJobs();
   const working = busy || processing;
+  useEffect(() => { if (job?.status === 'done') setLibraryRevision(n => n + 1); }, [job?.id, job?.status]);
 
   const show = (d: Draft | null) => { draftRef.current = d; setDraft(d); dirty.current = false; revision.current++; setSaveStatus('已保存'); };
   function updateList(d: Draft) { setDrafts(previous => [d, ...previous.filter(item => item.id !== d.id)].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))); }
@@ -56,10 +63,13 @@ export function App() {
     catch (error) { const text = errorText(error); if (!text.includes('取消')) setNotice({ text, error: true, retry: () => void perform(action) }); }
     finally { setBusy(false); }
   }
-  const select = (item: Draft) => { void perform(async () => { await flush(); show(item); setPage('workbench'); }); };
+  const select = (item: Draft) => { void perform(async () => { await flush(); const current = (await window.desktop.listDrafts()).drafts.find(d => d.id === item.id); show(current || item); setPage('workbench'); }); };
   const newDraft = (platform: Draft['platform']) => { void perform(async () => { await flush(); const next = await window.desktop.createDraft(platform); updateList(next); show(next); setQuery(''); setPage('workbench'); }); };
   const backToLibrary = () => { if (working) return; void perform(async () => { await flush(); setPage('library'); }); };
-  const addItems = (items: MediaAsset[]) => { const current = draftRef.current; if (current) { if (current.items.length + items.length > 200) throw new Error('每份草稿最多整理 200 个素材，请新建草稿继续添加'); change({ items: [...current.items, ...items] }); } };
+  const addItems = (items: MediaAsset[]) => { const current = draftRef.current; if (current) {
+    const unique = new Map(current.items.map(item => [item.id, item])); for (const item of items) unique.set(item.id, item);
+    if (unique.size > 200) throw new Error('每份草稿最多整理 200 个素材，请新建草稿继续添加'); change({ items: [...unique.values()] });
+  } };
   const importFiles = (paths?: string[]) => { void perform(async () => { const selected = paths || await window.desktop.pickImages(); if (!selected.length) return; if ((draftRef.current?.items.length || 0) + selected.length > 200) throw new Error('每份草稿最多整理 200 个素材，请分成多份草稿'); const items = await run<MediaAsset[]>('images', selected); addItems(items); setNotice({ text: `已加入 ${items.length} 张图片` }); }); };
   function reorder(from: number, to: number) { if (!draft || from === to || from < 0 || to < 0 || to >= draft.items.length) return; const items = [...draft.items]; const [item] = items.splice(from, 1); items.splice(to, 0, item); change({ items }); }
   const doExport = () => { void perform(async () => {
@@ -67,18 +77,66 @@ export function App() {
     const result = await run<{ path: string }>('export', { draftId: draftRef.current.id, directory: exportDirectory, format: exportFormat, targets }); setExportResult(result.path);
   }); };
   const hasLive = draft?.items.some(item => item.kind === 'live');
+  const navigate = (next: typeof page) => void perform(async () => { await flush(); setPage(next); });
+  const copyImage = (id: string) => void perform(async () => { await window.desktop.copyImage(id); setNotice({ text: '图片已复制，请先粘贴到外部工具，再复制提示词' }); });
+  const copyPrompt = (prompt: string) => void perform(async () => { await window.desktop.copyText(prompt); setNotice({ text: '提示词已复制' }); });
+  const openOptimization = (asset: MediaAsset) => void perform(async () => {
+    await flush();
+    if (asset.optimization) {
+      const original = await window.desktop.getAsset(asset.optimization.sourceId);
+      setOptimization({ source: original, result: asset, templateId: asset.optimization.templateId, prompt: asset.optimization.prompt, step: 3 });
+    } else setOptimization(previous => ({ ...previous, source: asset, result: null, step: 2 }));
+    setCropAsset(null); setAssetPicker(null); setPage('optimization');
+  });
+  const importToLibrary = () => void perform(async () => {
+    const paths = await window.desktop.pickImages(); if (!paths.length) return;
+    await run<MediaAsset[]>('images', paths); setNotice({ text: `已保存 ${paths.length} 张图片到素材库` });
+  });
+  const importOptimizationSource = () => void perform(async () => {
+    const paths = await window.desktop.pickImages(); if (!paths.length) return;
+    if (paths.length !== 1) throw new Error('请一次选择一张原图');
+    const [source] = await run<MediaAsset[]>('images', paths);
+    setOptimization(previous => ({ ...previous, source, result: null, step: 2 })); setAssetPicker(null);
+  });
+  const openLibraryVideo = (id: string) => void perform(async () => {
+    await flush(); setVideoSource(id ? await window.desktop.getVideo(id) : null); setVideoOpen(true); setAssetPicker(null);
+  });
+  const selectLibraryItems = (items: MediaAsset[]) => void perform(async () => { addItems(items); setAssetPicker(null); setPage('workbench'); setNotice({ text: '素材已加入当前草稿' }); });
+  const renderAssets = (mode: 'manage' | 'pick' | 'ai') => <AssetBrowser busy={working} refreshKey={libraryRevision} mode={mode}
+    excludeIds={mode === 'ai' ? [] : draft?.items.map(item => item.id)}
+    onImport={mode === 'ai' ? importOptimizationSource : mode === 'pick' ? () => void perform(async () => {
+      const paths = await window.desktop.pickImages(); if (!paths.length) return;
+      const items = await run<MediaAsset[]>('images', paths); addItems(items); setAssetPicker(null);
+    }) : importToLibrary}
+    onUse={mode === 'ai' ? items => { setOptimization(previous => ({ ...previous, source: items[0], result: null, step: 2 })); setAssetPicker(null); } : draft ? selectLibraryItems : undefined}
+    onOptimize={openOptimization} onVideo={openLibraryVideo} perform={action => void perform(action)}/>;
   return <div className="app-shell">
     <header className="app-header">
       <strong>片语</strong>
-      {page === 'workbench' && <button disabled={working} onClick={backToLibrary}>返回草稿列表</button>}
-      <span>{page === 'library' ? '草稿列表' : '预览工作台'}</span>
-      <span role="status">{page === 'library' ? '本地保存' : saveStatus}</span>
+      {page !== 'library' && <button disabled={working} onClick={backToLibrary}>返回草稿列表</button>}
+      {draft && page !== 'workbench' && <button disabled={working} onClick={() => navigate('workbench')}>返回当前草稿</button>}
+      <nav className="controls" aria-label="工作区导航">
+        <button aria-pressed={page === 'assets'} disabled={working} onClick={() => navigate('assets')}>全局素材库</button>
+        <button aria-pressed={page === 'optimization'} disabled={working} onClick={() => navigate('optimization')}>AI 图片优化</button>
+      </nav>
+      <span role="status">{draft ? saveStatus : '本地保存'}</span>
       <button onClick={() => setAbout(true)}>使用与存储</button>
     </header>
-    <main className="page-body">
-      {loading ? <p role="status">正在加载草稿…</p> : page === 'library' || !draft ?
+    <main ref={pageBody} className="page-body">
+      {loading ? <p role="status">正在加载草稿…</p> : page === 'assets' ? <section className="page-content" aria-label="全局素材库">
+        <h1>全局素材库</h1><p>所有草稿共用一份素材库。原图、截图、实况与手动导入的优化结果都保存在本机。</p>{renderAssets('manage')}
+      </section> : page === 'optimization' ? <OptimizationPage session={optimization} setSession={setOptimization} busy={working}
+        selectImage={() => setAssetPicker('ai')} importImage={importOptimizationSource} copyImage={copyImage} copyPrompt={copyPrompt}
+        canUseResult={!!draft && !!optimization.result && !draft.items.some(i => i.id === optimization.result!.id)}
+        useResult={() => { if (optimization.result) selectLibraryItems([optimization.result]); }}
+        importResult={() => void perform(async () => {
+          if (!optimization.source) return; const paths = await window.desktop.pickImages(); if (!paths.length) return;
+          if (paths.length !== 1) throw new Error('请一次选择一张优化结果');
+          const result = await run<MediaAsset>('optimization', { path: paths[0], sourceId: optimization.source.id, templateId: optimization.templateId, prompt: optimization.prompt });
+          setOptimization(previous => ({ ...previous, result })); setNotice({ text: '优化结果已保存到素材库，原图保留' });
+        })}/> : page === 'library' || !draft ?
         <LibraryPage drafts={drafts} filter={filter} query={query} busy={working} setFilter={setFilter} setQuery={setQuery} create={newDraft} open={select}/> :
-        <WorkbenchPage draft={draft} busy={working} change={change} importFiles={importFiles}
+        <WorkbenchPage draft={draft} busy={working} change={change} importFiles={importFiles} addImages={() => setAssetPicker('draft')}
           openVideo={() => setVideoOpen(true)} reorder={reorder} edit={setCropAsset}
           rejectVideoDrop={() => setNotice({ text: '视频请通过“从视频取材”打开', error: true })}
           duplicate={() => void perform(async () => { await flush(); const next = await window.desktop.duplicateDraft(draft.id); updateList(next); show(next); })}
@@ -97,7 +155,8 @@ export function App() {
       <progress aria-label="任务进度" max="100" value={job.progress}/>
       <p>{job.message}</p><button onClick={() => void cancel()}>取消任务</button>
     </div>}
-    {cropAsset && <CropEditor asset={cropAsset} busy={working} close={() => setCropAsset(null)} remove={() => {
+    {assetPicker && <Modal title={assetPicker === 'ai' ? '选择优化原图' : '添加图片'} onClose={() => setAssetPicker(null)} busy={working} wide>{renderAssets(assetPicker === 'ai' ? 'ai' : 'pick')}</Modal>}
+    {cropAsset && <CropEditor asset={cropAsset} busy={working} optimize={() => openOptimization(cropAsset)} close={() => setCropAsset(null)} remove={() => {
       const current = draftRef.current; if (current) change({ items: current.items.filter(item => item.id !== cropAsset.id) });
       setCropAsset(null);
     }} save={edits => void perform(async () => {
@@ -105,8 +164,8 @@ export function App() {
       const current = draftRef.current; if (current) change({ items: current.items.map(i => i.id === cropAsset.id ? item : i) });
       setCropAsset(null);
     })}/>}
-    {videoOpen && <VideoTool source={videoSource} setSource={setVideoSource} busy={working} run={run}
-      perform={action => void perform(action)} add={asset => { addItems([asset]); setNotice({ text: '素材已加入当前草稿' }); }} close={() => setVideoOpen(false)}/>}
+    {videoOpen && <VideoTool source={videoSource} setSource={setVideoSource} busy={working} run={run} toLibrary={page !== 'workbench'}
+      perform={action => void perform(action)} add={asset => { if (page === 'workbench') addItems([asset]); setNotice({ text: page === 'workbench' ? '素材已加入当前草稿' : '素材已保存到全局素材库' }); }} close={() => setVideoOpen(false)}/>}
     {exportOpen && <Modal title={exportResult ? '导出完成' : '导出发布素材包'} onClose={() => setExportOpen(false)} busy={working}>
       {exportResult ? <div className="export-success">
         <h3>素材包已保存</h3><p>图片按顺序编号，文案单独保存。</p>
@@ -137,7 +196,8 @@ export function App() {
       </>}
     </Modal>}
     {about && <Modal title="片语 · 使用与存储" onClose={() => setAbout(false)}>
-      <ol><li>添加图片，或从视频中截取画面与实况。</li><li>调整顺序与画面，编辑发布文案。</li><li>在右侧检查效果，导出文件夹或 ZIP。</li></ol>
+      <ol><li>添加图片，或从视频中截取画面与实况。</li><li>在预览中调整顺序与画面，编辑发布文案。</li><li>检查效果，导出文件夹或 ZIP。</li></ol>
+      <p>全局素材库可跨草稿选用图片与实况，并复用视频。AI 图片优化提供提示词模板、图片复制与手动结果对比，不连接 AI 服务。</p>
       <h3>本地资料库</h3>
       <p>草稿自动保存，导入素材复制到资料库。删除草稿不会删除原始文件。请在应用关闭时备份整个资料库。</p>
       <p className="destination-path">{info?.dataDirectory || '正在读取…'}</p>
