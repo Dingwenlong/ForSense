@@ -35,7 +35,7 @@ export interface DesktopAPI {
   listDrafts(): Promise<{ drafts: Draft[]; warnings: string[] }>;
   createDraft(platform: Platform): Promise<Draft>;
   saveDraft(draft: Draft): Promise<Draft>;
-  duplicateDraft(id: string): Promise<Draft>;
+  saveDraftAs(id: string, title: string): Promise<Draft>;
   deleteDraft(id: string): Promise<void>;
   pickImages(): Promise<string[]>;
   pickVideo(): Promise<string | null>;

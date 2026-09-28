@@ -1,10 +1,10 @@
 import type { Draft, MediaAsset } from '../shared/types';
 import { Preview } from './Preview';
 
-export function WorkbenchPage({ draft, busy, change, importFiles, addImages, openVideo, reorder, edit, duplicate, remove, rejectVideoDrop, copy, exportPackage }: {
+export function WorkbenchPage({ draft, busy, change, importFiles, addImages, openVideo, reorder, edit, saveAs, rejectVideoDrop, copy, exportPackage }: {
   draft: Draft; busy: boolean; change: (patch: Partial<Draft>) => void;
   importFiles: (paths?: string[]) => void; addImages: () => void; openVideo: () => void; reorder: (from: number, to: number) => void;
-  edit: (asset: MediaAsset) => void; duplicate: () => void; remove: () => void;
+  edit: (asset: MediaAsset) => void; saveAs: () => void;
   rejectVideoDrop: () => void; copy: () => void; exportPackage: () => void;
 }) {
   function handleFiles(files: FileList) {
@@ -23,16 +23,15 @@ export function WorkbenchPage({ draft, busy, change, importFiles, addImages, ope
           onChange={event => change({ title: event.target.value })}
           onBlur={() => { if (!draft.title.trim()) change({ title: '未命名草稿' }); }}/>
       </label>
-      <label>发布平台
-        <select aria-label="发布平台" value={draft.platform} disabled={busy} onChange={event => change({ platform: event.target.value as Draft['platform'] })}>
-          <option value="moments">朋友圈</option><option value="douyin">抖音图文</option>
-        </select>
-      </label>
+      <div className="platform-control" role="group" aria-label="预览平台">
+        <span>预览平台</span><span className={draft.platform === 'moments' ? 'platform-active' : ''}>微信</span>
+        <button type="button" role="switch" aria-label="抖音预览" aria-checked={draft.platform === 'douyin'} disabled={busy} className="platform-switch"
+          onClick={() => change({ platform: draft.platform === 'moments' ? 'douyin' : 'moments' })}><span aria-hidden="true"/></button>
+        <span className={draft.platform === 'douyin' ? 'platform-active' : ''}>抖音</span>
+      </div>
       <button disabled={busy} onClick={openVideo}>从视频取材</button>
       <button disabled={!draft.caption} onClick={copy}>复制文案</button>
-      <details className="draft-operations"><summary>草稿操作</summary><div className="controls">
-        <button disabled={busy} onClick={duplicate}>复制草稿</button><button disabled={busy} onClick={remove}>删除草稿</button>
-      </div></details>
+      <button disabled={busy} onClick={saveAs}>另存草稿</button>
       <button disabled={busy || (!draft.items.length && !draft.caption.trim())} onClick={exportPackage}>导出素材包</button>
     </div>
     <div className="workbench-preview" aria-label="实时预览">

@@ -21,29 +21,37 @@ img, video { max-width: 100%; }
 /* Library and live preview workbench. */
 .app-shell { display: flex; flex-direction: column; height: 100vh; min-height: 0; }
 .app-header { display: flex; align-items: center; gap: 16px; padding: 10px 18px; border-bottom: 1px solid GrayText; }
-.app-header > span:not([role="status"]) { min-width: 0; flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.app-header > span[role="status"] { white-space: nowrap; }
 .app-header > nav { flex: 1; }
 .page-body { flex: 1; min-height: 0; overflow: auto; }
 .page-content { width: min(100%, 1160px); margin: 0 auto; padding: 16px 22px 24px; }
 .page-content > h1 { margin-top: 4px; }
 .library-page { max-width: 960px; }
-.library-page fieldset label { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; }
-.library-page fieldset input { min-width: 0; width: 260px; }
-.library-filters { margin-top: 12px; }
+.draft-search { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; border: 1px solid GrayText; margin: 18px 0; padding: 7px 10px; }
+.draft-search:focus-within { outline: 2px solid Highlight; outline-offset: 1px; }
+.draft-search > select { border: 0; background: transparent; max-width: 110px; cursor: pointer; }
+.draft-search > input { flex: 1; min-width: 180px; padding: 4px 0; border: 0; outline: none; background: transparent; }
+.draft-search-tag { display: inline-flex; align-items: center; gap: 5px; border: 1px solid #bbb; background: #eee; padding: 2px 5px; white-space: nowrap; }
+.draft-search-tag button, .draft-search-clear { border: 0; background: transparent; padding: 0 4px; }
+.draft-search-clear { font-size: 19px; }
 .library-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; }
-.library-card { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 70px; padding: 8px; text-align: left; }
-.library-card > span:nth-child(2) { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.library-card > img { width: 45px; height: 55px; object-fit: cover; flex-shrink: 0; }
+.library-card { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 70px; padding: 8px; border: 1px solid GrayText; text-align: left; }
+.library-card-open { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; align-self: stretch; border: 0; background: transparent; padding: 0; text-align: left; }
+.library-card-open > span:nth-last-child(2) { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.library-card-open > img { width: 45px; height: 55px; object-fit: cover; flex-shrink: 0; }
 
 /* A small toolbar surrounds the preview; editing happens in the preview card. */
 .workbench-page { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 .workbench-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 10px 14px; border-bottom: 1px solid GrayText; }
 .workbench-toolbar label { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .workbench-toolbar input { min-width: 0; width: 210px; }
-.workbench-toolbar select { min-width: 110px; }
+.platform-control { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+.platform-active { font-weight: bold; }
+.platform-switch { width: 38px; height: 22px; padding: 2px; border: 1px solid #777; border-radius: 12px; background: #ddd; }
+.platform-switch > span { display: block; width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 1px solid #999; }
+.platform-switch[aria-checked="true"] { background: #444; }
+.platform-switch[aria-checked="true"] > span { transform: translateX(16px); }
+.platform-switch:disabled { opacity: .5; }
 .workbench-toolbar > button:last-child { margin-left: auto; }
-.draft-operations .controls { margin-top: 8px; }
 .workbench-preview { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .workbench-preview-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 10px 14px; border-bottom: 1px solid GrayText; }
 .workbench-preview-head h1 { margin: 0 0 3px; }

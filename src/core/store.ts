@@ -119,10 +119,11 @@ export class Store {
     this.writes.set(data.id, write);
     try { return await write; } finally { if (this.writes.get(data.id) === write) this.writes.delete(data.id); }
   }
-  async duplicate(id: string) {
+  async duplicate(id: string, title?: string) {
+    const name = title === undefined ? undefined : z.string().trim().min(1).max(120).parse(title);
     await this.writes.get(id);
     const original = await this.load(id), now = new Date().toISOString();
-    const draft = { ...original, id: randomUUID(), title: (original.title.slice(0, 115) + ' 副本'), createdAt: now, updatedAt: now };
+    const draft = { ...original, id: randomUUID(), title: name ?? (original.title.slice(0, 115) + ' 副本'), createdAt: now, updatedAt: now };
     await atomicJSON(this.draftFile(draft.id), draft); return draft;
   }
   async remove(id: string) { await this.writes.get(id); await fs.unlink(this.draftFile(id)); }

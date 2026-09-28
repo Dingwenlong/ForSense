@@ -48,7 +48,7 @@ try {
   await page.screenshot({ path: path.join(output, '01-library.png') });
   record('Packaged app opens its empty draft library');
 
-  await page.getByRole('button', { name: '新建朋友圈图文', exact: true }).click();
+  await page.getByRole('button', { name: '新建草稿', exact: true }).click();
   await page.getByRole('heading', { name: '实时预览', exact: true }).waitFor();
   assert.equal(await page.locator('.workbench-editor, .asset-card, .editor-tabs').count(), 0);
   assert.equal(await page.locator('.wechat-proof__add').count(), 1);
@@ -91,7 +91,7 @@ try {
   await page.screenshot({ path: path.join(output, '05-wechat-preview.png') });
   record('WeChat placeholder adds images; drag, keyboard reorder and click-to-edit remain usable');
 
-  await page.getByRole('combobox', { name: '发布平台', exact: true }).selectOption('douyin');
+  await page.getByRole('switch', { name: '抖音预览', exact: true }).click();
   assert.equal(await page.locator('.douyin-proof').count(), 1);
   assert.equal(await page.locator('.douyin-proof__add').count(), 1);
   await page.getByRole('button', { name: '编辑发布文案', exact: true }).click();
@@ -128,8 +128,9 @@ try {
   await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1440, 930));
   record('Preview controls and export remain accessible in the minimum desktop window');
 
-  await page.locator('.draft-operations summary').click();
-  await page.getByRole('button', { name: '复制草稿', exact: true }).click();
+  await page.getByRole('button', { name: '另存草稿', exact: true }).click();
+  await page.getByRole('textbox', { name: '新草稿名称', exact: true }).fill('海边的慢日子 · 副本');
+  await page.getByRole('button', { name: '保存新草稿', exact: true }).click();
   await waitFor(async () => (await title.inputValue()).endsWith('副本'));
   await page.locator('.douyin-proof__image').click();
   await page.getByRole('dialog', { name: '调整画面' }).getByRole('button', { name: '移除图片', exact: true }).click();
@@ -140,14 +141,30 @@ try {
   await page.getByRole('textbox', { name: '搜索草稿', exact: true }).fill('没有这个标题');
   assert.equal(await page.locator('.library-card').count(), 0);
   await page.getByRole('button', { name: '清空搜索', exact: true }).click();
-  await page.locator('.library-card').filter({ hasText: '副本' }).click();
-  await page.locator('.draft-operations summary').click();
-  await page.getByRole('button', { name: '删除草稿', exact: true }).click();
+  await page.getByRole('combobox', { name: '添加平台标签', exact: true }).selectOption('moments');
+  assert.equal(await page.locator('.library-card').count(), 0);
+  await page.getByRole('combobox', { name: '添加平台标签', exact: true }).selectOption('douyin');
+  assert.equal(await page.locator('.library-card').count(), 2);
+  await page.getByRole('textbox', { name: '搜索草稿', exact: true }).fill('副本');
+  assert.equal(await page.locator('.library-card').count(), 1);
+  await page.getByRole('button', { name: '移除抖音标签', exact: true }).click();
+  assert.equal(await page.getByRole('textbox', { name: '搜索草稿', exact: true }).inputValue(), '副本');
+  assert.equal(await page.locator('.library-card').count(), 1);
+  await page.getByRole('button', { name: '清空搜索', exact: true }).click();
+  await page.getByRole('combobox', { name: '添加平台标签', exact: true }).selectOption('douyin');
+  await page.getByRole('textbox', { name: '搜索草稿', exact: true }).fill('海边 慢');
+  assert.equal(await page.locator('.library-card').count(), 2);
+  await page.screenshot({ path: path.join(output, '12-tag-search.png') });
+  await page.getByRole('button', { name: '清空搜索', exact: true }).click();
+  await page.locator('.library-card').filter({ hasNotText: '副本' }).locator('.library-card-open').click();
+  await page.getByRole('button', { name: '返回草稿列表', exact: true }).click();
+  await page.locator('.library-card').filter({ hasText: '副本' }).getByRole('button', { name: /^删除草稿 / }).click();
   await page.getByRole('dialog', { name: '删除这份草稿？' }).getByRole('button', { name: '删除草稿', exact: true }).click();
+  await page.getByRole('dialog', { name: '删除这份草稿？' }).waitFor({ state: 'hidden' });
   await page.getByRole('heading', { name: '我的草稿', exact: true }).waitFor();
   assert.equal(await page.locator('.library-card').count(), 1);
-  await page.locator('.library-card').filter({ hasText: '海边的慢日子' }).click();
-  record('Duplicate, search and delete still work without a left panel');
+  await page.getByRole('button', { name: '返回当前草稿', exact: true }).click();
+  record('Save as preserves the original; platform tags combine with keywords; deletion works from the list');
 
   await page.getByRole('button', { name: '从视频取材', exact: true }).click();
   await selectFiles([inputVideo]);
@@ -161,7 +178,7 @@ try {
   await page.getByRole('button', { name: '制作并加入草稿', exact: true }).click();
   await waitFor(async () => (await page.locator('.image-counter').innerText()).endsWith('/6'));
   await page.getByRole('button', { name: '返回图文', exact: true }).click();
-  await page.getByRole('combobox', { name: '发布平台', exact: true }).selectOption('moments');
+  await page.getByRole('switch', { name: '抖音预览', exact: true }).click();
   assert.equal(await photos().count(), 6);
   await page.locator('.wechat-proof__live').click();
   await page.getByRole('dialog', { name: '实况预览' }).waitFor();
@@ -195,13 +212,14 @@ try {
   await page.getByRole('textbox', { name: '发布文案', exact: true }).fill(douyinCaption + '\n刚刚补上的一句。');
   await application.close(); application = null;
   await launch();
-  await page.locator('.library-card').filter({ hasText: '海边的慢日子' }).click();
+  await page.locator('.library-card').filter({ hasText: '海边的慢日子' }).locator('.library-card-open').click();
   assert.equal(await page.getByRole('textbox', { name: '发布文案', exact: true }).inputValue(), douyinCaption + '\n刚刚补上的一句。');
   assert.equal(await photos().count(), 6);
   record('Closing while editing inline caption flushes the draft for restart');
 
   await page.getByRole('button', { name: '返回草稿列表', exact: true }).click();
-  await page.getByRole('button', { name: '新建抖音图文', exact: true }).click();
+  await page.getByRole('button', { name: '新建草稿', exact: true }).click();
+  await page.getByRole('switch', { name: '抖音预览', exact: true }).click();
   await page.locator('.douyin-proof__add-empty').waitFor();
   await page.getByRole('button', { name: '编辑发布文案', exact: true }).click();
   await page.getByRole('textbox', { name: '发布文案', exact: true }).fill('只有文字也能保存。');

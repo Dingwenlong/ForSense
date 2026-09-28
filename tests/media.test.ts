@@ -58,7 +58,13 @@ test('Windows media pipeline: frame, paired Live Photo, Motion Photo, edits, per
     assert.ok(length > 0); assert.equal(android.subarray(android.length - length + 4, android.length - length + 8).toString(), 'ftyp');
     const zip = await service.execute('export', { draftId: draft.id, directory: root, format: 'zip', targets: ['android'] }, signal, report) as { path: string };
     assert.equal((await fs.readFile(zip.path)).subarray(0, 2).toString(), 'PK');
-    const duplicate = await store.duplicate(draft.id); assert.notEqual(duplicate.id, draft.id); assert.equal(duplicate.items.length, 2);
+    const duplicate = await store.duplicate(draft.id, '  另存的周末 🌊  '); assert.notEqual(duplicate.id, draft.id); assert.equal(duplicate.items.length, 2);
+    assert.equal(duplicate.title, '另存的周末 🌊');
+    await store.save({ ...duplicate, caption: '独立文案', items: [edited] });
+    assert.equal((await store.load(draft.id)).caption, draft.caption); assert.equal((await store.load(draft.id)).items.length, 2);
+    const draftFiles = await fs.readdir(path.join(store.root, 'drafts'));
+    await assert.rejects(store.duplicate(draft.id, '   '));
+    assert.deepEqual(await fs.readdir(path.join(store.root, 'drafts')), draftFiles);
     await assert.rejects(service.execute('live', { sourceId: source.id, start: 0, end: 4, cover: 1, mute: true }, signal, report));
     const cancelled = new AbortController(); cancelled.abort();
     await assert.rejects(service.execute('images', [input], cancelled.signal, report), /取消/);

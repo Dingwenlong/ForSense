@@ -13,12 +13,12 @@ export function App() {
   const [drafts, setDrafts] = useState<Draft[]>([]), [draft, setDraft] = useState<Draft | null>(null), [page, setPage] = useState<'library' | 'workbench' | 'assets' | 'optimization'>('library'), [filter, setFilter] = useState<'all' | 'moments' | 'douyin'>('all'), [query, setQuery] = useState('');
   const [libraryRevision, setLibraryRevision] = useState(0), [assetPicker, setAssetPicker] = useState<'draft' | 'ai' | null>(null);
   const [optimization, setOptimization] = useState<OptimizationSession>(emptyOptimizationSession);
-  const [busy, setBusy] = useState(false), [loading, setLoading] = useState(true), [saveStatus, setSaveStatus] = useState('已保存');
+  const [busy, setBusy] = useState(false), [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<{ text: string; error?: boolean; retry?: () => void } | null>(null);
   const [cropAsset, setCropAsset] = useState<MediaAsset | null>(null), [videoOpen, setVideoOpen] = useState(false), [videoSource, setVideoSource] = useState<VideoSource | null>(null);
   const [exportOpen, setExportOpen] = useState(false), [exportDirectory, setExportDirectory] = useState(''), [exportFormat, setExportFormat] = useState<'folder' | 'zip'>('folder'), [targets, setTargets] = useState<('apple' | 'android')[]>(['apple', 'android']);
-  const [exportResult, setExportResult] = useState<string | null>(null), [about, setAbout] = useState(false), [deleteConfirm, setDeleteConfirm] = useState(false);
-  const [info, setInfo] = useState<{ version: string; dataDirectory: string; compatibility: string } | null>(null);
+  const [exportResult, setExportResult] = useState<string | null>(null), [deleteTarget, setDeleteTarget] = useState<Draft | null>(null);
+  const [saveAsOpen, setSaveAsOpen] = useState(false), [saveAsTitle, setSaveAsTitle] = useState('');
   const draftRef = useRef<Draft | null>(null), timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined), revision = useRef(0), dirty = useRef(false), saveQueue = useRef<Promise<unknown>>(Promise.resolve());
   const pageBody = useRef<HTMLElement>(null);
   useEffect(() => { pageBody.current?.scrollTo(0, 0); }, [page]);
@@ -26,23 +26,21 @@ export function App() {
   const working = busy || processing;
   useEffect(() => { if (job?.status === 'done') setLibraryRevision(n => n + 1); }, [job?.id, job?.status]);
 
-  const show = (d: Draft | null) => { draftRef.current = d; setDraft(d); dirty.current = false; revision.current++; setSaveStatus('已保存'); };
+  const show = (d: Draft | null) => { draftRef.current = d; setDraft(d); dirty.current = false; revision.current++; };
   function updateList(d: Draft) { setDrafts(previous => [d, ...previous.filter(item => item.id !== d.id)].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))); }
   function change(patch: Partial<Draft>) {
     const current = draftRef.current; if (!current) return;
     const next = { ...current, ...patch, updatedAt: new Date().toISOString() };
-    draftRef.current = next; setDraft(next); updateList(next); dirty.current = true; revision.current++; setSaveStatus('尚未保存');
+    draftRef.current = next; setDraft(next); updateList(next); dirty.current = true; revision.current++;
     clearTimeout(timer.current); timer.current = setTimeout(() => { void flush().catch(error => setNotice({ text: errorText(error), error: true, retry: () => void flush().catch(error => setNotice({ text: errorText(error), error: true })) })); }, 600);
   }
   async function flush() {
     clearTimeout(timer.current);
     if (!draftRef.current || !dirty.current) { await saveQueue.current; return; }
     const snapshot = { ...draftRef.current, title: draftRef.current.title.trim() || '未命名草稿' }, savedRevision = revision.current;
-    setSaveStatus('保存中…');
     const next = saveQueue.current.catch(() => {}).then(() => window.desktop.saveDraft(snapshot));
     saveQueue.current = next;
-    try { await next; if (savedRevision === revision.current) { dirty.current = false; setSaveStatus('已保存'); } }
-    catch (error) { setSaveStatus('保存失败'); throw error; }
+    await next; if (savedRevision === revision.current) dirty.current = false;
   }
   const flushRef = useRef(flush); flushRef.current = flush;
   useEffect(() => {
@@ -52,7 +50,6 @@ export function App() {
       if (result.warnings.length) setNotice({ text: result.warnings.join('；'), error: true });
       setDrafts(result.drafts);
     }).catch(error => setNotice({ text: errorText(error), error: true })).finally(() => setLoading(false));
-    void window.desktop.getInfo().then(setInfo);
     const off = window.desktop.onClose(() => { void flushRef.current().then(() => window.desktop.closeReady()).catch(error => setNotice({ text: '草稿未保存，已保留窗口：' + errorText(error), error: true })); });
     return () => { active = false; off(); clearTimeout(timer.current); };
   }, []);
@@ -64,7 +61,7 @@ export function App() {
     finally { setBusy(false); }
   }
   const select = (item: Draft) => { void perform(async () => { await flush(); const current = (await window.desktop.listDrafts()).drafts.find(d => d.id === item.id); show(current || item); setPage('workbench'); }); };
-  const newDraft = (platform: Draft['platform']) => { void perform(async () => { await flush(); const next = await window.desktop.createDraft(platform); updateList(next); show(next); setQuery(''); setPage('workbench'); }); };
+  const newDraft = () => { void perform(async () => { await flush(); const next = await window.desktop.createDraft('moments'); updateList(next); show(next); setQuery(''); setFilter('all'); setPage('workbench'); }); };
   const backToLibrary = () => { if (working) return; void perform(async () => { await flush(); setPage('library'); }); };
   const addItems = (items: MediaAsset[]) => { const current = draftRef.current; if (current) {
     const unique = new Map(current.items.map(item => [item.id, item])); for (const item of items) unique.set(item.id, item);
@@ -117,9 +114,8 @@ export function App() {
       {draft && page !== 'workbench' && <button disabled={working} onClick={() => navigate('workbench')}>返回当前草稿</button>}
       <nav className="controls" aria-label="工作区导航">
         <button aria-pressed={page === 'assets' || page === 'optimization'} disabled={working} onClick={() => navigate('assets')}>全局素材库</button>
+        <button disabled={working} onClick={newDraft}>新建草稿</button>
       </nav>
-      <span role="status">{draft ? saveStatus : '本地保存'}</span>
-      <button onClick={() => setAbout(true)}>使用与存储</button>
     </header>
     <main ref={pageBody} className="page-body">
       {loading ? <p role="status">正在加载草稿…</p> : page === 'assets' ? <section className="page-content" aria-label="全局素材库">
@@ -134,12 +130,11 @@ export function App() {
           const result = await run<MediaAsset>('optimization', { path: paths[0], sourceId: optimization.source.id, templateId: optimization.templateId, prompt: optimization.prompt });
           setOptimization(previous => ({ ...previous, result })); setNotice({ text: '优化结果已保存到素材库，原图保留' });
         })}/> : page === 'library' || !draft ?
-        <LibraryPage drafts={drafts} filter={filter} query={query} busy={working} setFilter={setFilter} setQuery={setQuery} create={newDraft} open={select}/> :
+        <LibraryPage drafts={drafts} filter={filter} query={query} busy={working} setFilter={setFilter} setQuery={setQuery} open={select} remove={setDeleteTarget}/> :
         <WorkbenchPage draft={draft} busy={working} change={change} importFiles={importFiles} addImages={() => setAssetPicker('draft')}
           openVideo={() => setVideoOpen(true)} reorder={reorder} edit={setCropAsset}
           rejectVideoDrop={() => setNotice({ text: '视频请通过“从视频取材”打开', error: true })}
-          duplicate={() => void perform(async () => { await flush(); const next = await window.desktop.duplicateDraft(draft.id); updateList(next); show(next); })}
-          remove={() => setDeleteConfirm(true)}
+          saveAs={() => { setSaveAsTitle((draft.title.trim() || '未命名草稿').slice(0, 115) + ' 副本'); setSaveAsOpen(true); }}
           copy={() => void perform(async () => { await window.desktop.copyText(draft.caption); setNotice({ text: '文案已复制，可粘贴到发布页面' }); })}
           exportPackage={() => { setExportOpen(true); setExportResult(null); }}/>
       }
@@ -194,24 +189,27 @@ export function App() {
         </footer>
       </>}
     </Modal>}
-    {about && <Modal title="片语 · 使用与存储" onClose={() => setAbout(false)}>
-      <ol><li>添加图片，或从视频中截取画面与实况。</li><li>在预览中调整顺序与画面，编辑发布文案。</li><li>检查效果，导出文件夹或 ZIP。</li></ol>
-      <p>全局素材库可跨草稿选用图片与实况，并复用视频。AI 图片优化提供提示词模板、图片复制与手动结果对比，不连接 AI 服务。</p>
-      <h3>本地资料库</h3>
-      <p>草稿自动保存，导入素材复制到资料库。删除草稿不会删除原始文件。请在应用关闭时备份整个资料库。</p>
-      <p className="destination-path">{info?.dataDirectory || '正在读取…'}</p>
-      <p>iPhone 与标准安卓实况的文件结构经过程序校验，真机兼容性仍待验证。</p>
-      <button onClick={() => void perform(() => window.desktop.openHelp())}>完整使用说明</button>
-      <p>版本 {info?.version || '正在读取…'} · 本地桌面应用</p>
+    {saveAsOpen && <Modal title="另存草稿" onClose={() => setSaveAsOpen(false)} busy={working}>
+      <form onSubmit={e => { e.preventDefault(); if (working || !saveAsTitle.trim()) return; void perform(async () => {
+        await flush(); const current = draftRef.current; if (!current) return;
+        const next = await window.desktop.saveDraftAs(current.id, saveAsTitle);
+        updateList(next); show(next); setSaveAsOpen(false); setNotice({ text: '已另存为新草稿，原草稿保留' });
+      }); }}>
+        <label className="field-label">新草稿名称<input aria-label="新草稿名称" maxLength={120} value={saveAsTitle} disabled={working} onChange={e => setSaveAsTitle(e.target.value)}/></label>
+        <p>将当前素材、顺序、文案和预览平台保存为一份独立草稿，之后继续编辑新草稿。</p>
+        <footer className="modal-footer"><button type="button" disabled={working} onClick={() => setSaveAsOpen(false)}>取消</button><button type="submit" disabled={working || !saveAsTitle.trim()}>保存新草稿</button></footer>
+      </form>
     </Modal>}
-    {deleteConfirm && <Modal title="删除这份草稿？" onClose={() => setDeleteConfirm(false)} busy={working}>
-      <p>将删除「{draft?.title}」的文案与素材排列，导入的原始文件不会被删除。</p>
+    {deleteTarget && <Modal title="删除这份草稿？" onClose={() => setDeleteTarget(null)} busy={working}>
+      <p>将删除「{deleteTarget.title}」的文案与素材排列，导入的原始文件不会被删除。</p>
       <footer className="modal-footer">
-        <button onClick={() => setDeleteConfirm(false)} disabled={working}>保留草稿</button>
+        <button onClick={() => setDeleteTarget(null)} disabled={working}>保留草稿</button>
         <button disabled={working} onClick={() => void perform(async () => {
-          await flush(); if (!draft) return;
-          await window.desktop.deleteDraft(draft.id);
-          const remaining = drafts.filter(d => d.id !== draft.id); setDrafts(remaining); show(null); setPage('library'); setDeleteConfirm(false);
+          await flush();
+          await window.desktop.deleteDraft(deleteTarget.id);
+          setDrafts(previous => previous.filter(d => d.id !== deleteTarget.id));
+          if (draftRef.current?.id === deleteTarget.id) show(null);
+          setPage('library'); setDeleteTarget(null);
         })}>删除草稿</button>
       </footer>
     </Modal>}
