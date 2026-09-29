@@ -36,3 +36,13 @@ export function messageOf(error: unknown) {
   if (code === 'ENOENT') return '文件不存在，请重新选择文件或保存位置';
   return error instanceof Error ? error.message : '操作失败，请重试';
 }
+
+export async function renameWithRetry(from: string, to: string) {
+  for (let attempt = 0; ; attempt++) {
+    try { await fs.rename(from, to); return; }
+    catch (error) {
+      if (process.platform !== 'win32' || attempt >= 5 || !['EPERM', 'EBUSY', 'EACCES'].includes((error as NodeJS.ErrnoException).code || '')) throw error;
+      await new Promise(resolve => setTimeout(resolve, 50 * 2 ** attempt));
+    }
+  }
+}

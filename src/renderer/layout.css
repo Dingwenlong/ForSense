@@ -269,3 +269,6 @@ img, video { max-width: 100%; }
 .material-search input::-webkit-search-cancel-button { appearance: none; }
 .library-directory-link { padding: 0; border: 0; background: transparent; color: #005ea8; text-decoration: underline; text-align: left; overflow-wrap: anywhere; cursor: pointer; }
 .library-directory-link:disabled { color: GrayText; cursor: wait; }
+
+.material-metadata > .favorite-button { margin-left: auto; }
+.material-extract { padding: 0 3px; font-size: 12px; }

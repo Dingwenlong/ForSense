@@ -3,6 +3,7 @@ import type { DesktopAPI, ExportJob } from './shared/types';
 const api: DesktopAPI = {
   deleteLibraryItems: items => ipcRenderer.invoke('library:delete', items),
   listLibrary: () => ipcRenderer.invoke('library:list'),
+  updateVideo: (id, patch) => ipcRenderer.invoke('library:video-update', id, patch),
   updateAsset: (id, patch) => ipcRenderer.invoke('library:update', id, patch),
   getAsset: id => ipcRenderer.invoke('library:asset', id),
   getVideo: id => ipcRenderer.invoke('library:video', id),
@@ -12,6 +13,7 @@ const api: DesktopAPI = {
   saveDraft: draft => ipcRenderer.invoke('drafts:save', draft),
   saveDraftAs: id => ipcRenderer.invoke('drafts:save-as', id),
   deleteDraft: id => ipcRenderer.invoke('drafts:delete', id),
+  pickMaterials: () => ipcRenderer.invoke('dialog:materials'),
   pickImages: () => ipcRenderer.invoke('dialog:images'),
   pickVideo: () => ipcRenderer.invoke('dialog:video'),
   pickDirectory: () => ipcRenderer.invoke('dialog:directory'),

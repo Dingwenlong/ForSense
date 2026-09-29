@@ -3,7 +3,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { Store } from './store';
-import { atomicJSON, inside } from './io';
+import { atomicJSON, inside, renameWithRetry } from './io';
 
 const selection = z.array(z.object({ kind: z.enum(['asset', 'video']), id: z.string().uuid() }).strict()).min(1).max(10000);
 const manifestSchema = z.object({ version: z.literal(1), items: selection });
@@ -17,7 +17,7 @@ async function restore(root: string, staging: string) {
     if (!stat) continue;
     if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error('删除恢复目录无效');
     if (await fs.lstat(to).then(() => true, (e: NodeJS.ErrnoException) => { if (e.code !== 'ENOENT') throw e; return false; })) throw new Error('删除恢复遇到同名素材，文件已保留');
-    await fs.rename(from, to);
+    await renameWithRetry(from, to);
   }
   for (const type of ['assets', 'sources']) await fs.rmdir(path.join(staging, type)).catch((e: NodeJS.ErrnoException) => { if (e.code !== 'ENOENT') throw e; });
   await fs.unlink(path.join(staging, 'manifest.json'));
@@ -55,7 +55,7 @@ export async function deleteLibraryItems(store: Store, input: unknown, trash: (d
     for (const item of items) {
       const type = item.kind === 'asset' ? 'assets' : 'sources';
       await fs.mkdir(path.join(staging, type), { recursive: true });
-      await fs.rename(store.directory(type, item.id), inside(staging, type, item.id));
+      await renameWithRetry(store.directory(type, item.id), inside(staging, type, item.id));
     }
     await trash(staging);
   } catch (error) {

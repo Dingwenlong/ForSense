@@ -7,7 +7,7 @@ import { z } from 'zod';
 import type { ExportJob, JobKind, Edits } from '../shared/types';
 import { draftName } from '../shared/draft-name';
 import { Store, editsSchema, uuid, type AssetRecord } from './store';
-import { inside, availablePath, messageOf, safeName } from './io';
+import { inside, availablePath, messageOf, safeName, renameWithRetry } from './io';
 import { type Tools, probe, runProcess, transcode, checkCancelled, Cancelled } from './process';
 import { appleJPEG, appleMOV, androidMotionPhoto, newLiveIdentifier } from './live-photo';
 
@@ -33,9 +33,9 @@ export class MediaService {
   readonly exported = new Set<string>();
   constructor(readonly store: Store, readonly tools: Tools, private publish: (job: ExportJob) => void) {}
   start(id: string, kind: JobKind, payload: unknown) {
-    uuid.parse(id); z.enum(['images', 'video', 'frame', 'live', 'edit', 'export', 'optimization']).parse(kind);
+    uuid.parse(id); z.enum(['materials', 'images', 'video', 'frame', 'live', 'edit', 'export', 'optimization']).parse(kind);
     if (this.jobs.has(id)) throw new Error('任务已存在');
-    const titles: Record<JobKind, string> = { images: '导入图片', video: '准备视频', frame: '截取画面', live: '制作实况', edit: '处理图片', export: '导出素材包', optimization: '导入优化结果' };
+    const titles: Record<JobKind, string> = { materials: '导入素材副本', images: '导入图片', video: '准备视频', frame: '截取画面', live: '制作实况', edit: '处理图片', export: '导出素材包', optimization: '导入优化结果' };
     const entry = { info: { id, kind, title: titles[kind], status: 'queued', progress: 0, message: '等待处理' } as ExportJob, controller: new AbortController() };
     this.jobs.set(id, entry);
     this.publish({ ...entry.info });
@@ -60,6 +60,7 @@ export class MediaService {
   async waitForIdle() { await this.queue; }
   async execute(kind: JobKind, payload: unknown, signal: AbortSignal, report: Report): Promise<unknown> {
     switch (kind) {
+      case 'materials': return this.importMaterials(listPaths.parse(payload), signal, report);
       case 'images': return this.importImages(listPaths.parse(payload), signal, report);
       case 'optimization': {
         const p = z.object({ path: z.string().min(1).max(32767), sourceId: uuid, templateId: z.string().min(1).max(80), prompt: z.string().trim().min(1).max(10000) }).parse(payload);
@@ -80,6 +81,29 @@ export class MediaService {
     await fs.mkdir(directory, { recursive: true });
     try { const record = await operation(id, directory); checkCancelled(signal); return await this.store.writeAsset(record); }
     catch (error) { await fs.rm(directory, { recursive: true, force: true }); throw error; }
+  }
+  async importMaterials(paths: string[], signal: AbortSignal, report: Report) {
+    for (const file of paths) if (!imageExtensions.has(path.extname(file).toLowerCase()) && !videoExtensions.has(path.extname(file).toLowerCase())) throw new Error('素材支持 JPG、PNG、WebP 图片和 MP4、MOV 视频');
+    const imported: { type: 'assets' | 'sources'; id: string }[] = [];
+    let images = 0, videos = 0;
+    try {
+      for (const [index, file] of paths.entries()) {
+        checkCancelled(signal);
+        const progress: Report = (value, message) => report((index + value) / paths.length, `${index + 1} / ${paths.length} · ${message || '正在导入素材副本'}`);
+        if (imageExtensions.has(path.extname(file).toLowerCase())) {
+          const [asset] = await this.importImages([file], signal, progress);
+          imported.push({ type: 'assets', id: asset.id }); images++;
+        } else {
+          const video = await this.importVideo(file, signal, progress);
+          imported.push({ type: 'sources', id: video.id }); videos++;
+        }
+        report((index + 1) / paths.length, `已导入 ${index + 1} / ${paths.length} 个素材副本`);
+      }
+      checkCancelled(signal); return { images, videos };
+    } catch (error) {
+      for (const item of imported) await fs.rm(this.store.directory(item.type, item.id), { recursive: true, force: true });
+      throw error;
+    }
   }
   async importImages(paths: string[], signal: AbortSignal, report: Report, optimization?: AssetRecord['optimization']) {
     const result = [];
@@ -225,8 +249,8 @@ export class MediaService {
         await add(temp); const output = createWriteStream(zipTemporary, { flags: 'wx' });
         const completion = pipeline(zip.outputStream, output, { signal }); zip.end();
         try { await completion; } catch (error) { checkCancelled(signal); throw error; }
-        checkCancelled(signal); await fs.rename(zipTemporary, destination); zipTemporary = undefined;
-      } else await fs.rename(temp, destination);
+        checkCancelled(signal); await renameWithRetry(zipTemporary, destination); zipTemporary = undefined;
+      } else await renameWithRetry(temp, destination);
       this.exported.add(destination); report(1, '素材包已导出');
       return { path: destination, count: draft.items.length };
     } finally {

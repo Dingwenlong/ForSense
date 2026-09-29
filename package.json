@@ -1,7 +1,7 @@
 {
   "name": "social-copy-studio",
   "productName": "SocialCopyStudio",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "description": "片语 · 本地社交图文工作台",
   "author": "Social Copy Studio",
   "private": true,
@@ -9,7 +9,7 @@
   "scripts": {
     "start": "electron-forge start",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/*.test.ts",
+    "test": "node scripts/test-core.mjs",
     "package": "electron-forge package --platform win32 --arch x64",
     "make": "electron-forge make --platform win32 --arch x64",
     "qa": "node scripts/desktop-qa.mjs",

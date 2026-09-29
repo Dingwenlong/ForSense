@@ -403,7 +403,7 @@ try {
   await page.getByRole('heading', { name: '素材库', exact: true }).waitFor();
   await waitFor(async () => await page.locator('.material-card').count() >= 7);
   await page.getByRole('combobox', { name: '素材分类', exact: true }).selectOption('video');
-  await page.getByRole('button', { name: '打开视频取材', exact: true }).click();
+  await page.getByRole('button', { name: '取材', exact: true }).click();
   await page.locator('.video-source-label').filter({ hasText: '短视频.mp4' }).waitFor();
   await page.getByRole('button', { name: '截取并保存到素材库', exact: true }).click();
   await page.getByText('素材已保存到素材库', { exact: true }).waitFor();
@@ -413,7 +413,7 @@ try {
 
   await page.getByRole('combobox', { name: '素材分类', exact: true }).selectOption('all');
   await selectFiles([path.join(root, 'public/ai-examples/product-before.png')]);
-  await page.getByRole('button', { name: '从电脑导入图片', exact: true }).click();
+  await page.getByRole('button', { name: '导入素材副本', exact: true }).click();
   await page.getByRole('searchbox', { name: '搜索素材', exact: true }).fill('product-before');
   await page.getByRole('button', { name: '查看素材 product-before.png', exact: true }).click();
   assert.equal(await page.getByRole('textbox', { name: '素材名称', exact: true }).count(), 0);
@@ -438,7 +438,7 @@ try {
 
   await page.getByRole('combobox', { name: '素材分类', exact: true }).selectOption('all');
   await selectFiles([path.join(root, 'public/ai-examples/food-before.png'), path.join(root, 'public/ai-examples/food-after.png')]);
-  await page.getByRole('button', { name: '从电脑导入图片', exact: true }).click();
+  await page.getByRole('button', { name: '导入素材副本', exact: true }).click();
   await page.getByRole('searchbox', { name: '搜索素材', exact: true }).fill('food-');
   await page.getByRole('checkbox', { name: '选择 food-before.png', exact: true }).check();
   await page.getByRole('checkbox', { name: '选择 food-after.png', exact: true }).check();
@@ -446,7 +446,12 @@ try {
   await page.getByRole('dialog', { name: '删除所选素材？', exact: true }).getByRole('button', { name: '返回上一层', exact: true }).click();
   assert.equal(await page.locator('.material-card').count(), 2);
   await application.evaluate(({ shell }, destination) => {
-    shell.trashItem = async directory => { await process.getBuiltinModule('node:fs').promises.rename(directory, destination); };
+    shell.trashItem = async directory => {
+      for (let attempt = 0; ; attempt++) {
+        try { await process.getBuiltinModule('node:fs').promises.rename(directory, destination); return; }
+        catch (error) { if (attempt >= 5 || !['EPERM', 'EBUSY', 'EACCES'].includes(error.code)) throw error; await new Promise(resolve => setTimeout(resolve, 50 * 2 ** attempt)); }
+      }
+    };
   }, path.join(work, 'recycled-batch'));
   await page.getByRole('button', { name: '批量删除', exact: true }).click();
   await page.getByRole('button', { name: '移到回收站', exact: true }).click();

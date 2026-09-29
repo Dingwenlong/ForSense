@@ -19,17 +19,18 @@ export interface Draft {
 }
 export interface VideoSource {
   id: string; name: string; videoUrl: string; duration: number; width: number; height: number;
-  frames: number[]; hasAudio: boolean;
+  frames: number[]; hasAudio: boolean; favorite?: boolean; createdAt?: string;
 }
 export interface LiveClip { sourceId: string; start: number; end: number; cover: number; mute: boolean }
 export interface ExportOptions { draftId: string; directory: string; format: 'folder' | 'zip'; targets: ('apple' | 'android')[] }
-export type JobKind = 'images' | 'video' | 'frame' | 'live' | 'edit' | 'export' | 'optimization';
+export type JobKind = 'materials' | 'images' | 'video' | 'frame' | 'live' | 'edit' | 'export' | 'optimization';
 export interface ExportJob {
   id: string; kind: JobKind; title: string; status: 'queued' | 'running' | 'done' | 'error' | 'cancelled';
   progress: number; message: string; result?: unknown; error?: string;
 }
 export interface DesktopAPI {
   listLibrary(): Promise<LibrarySnapshot>;
+  updateVideo(id: string, patch: { favorite: boolean }): Promise<VideoSource>;
   updateAsset(id: string, patch: AssetUpdate): Promise<MediaAsset>;
   getAsset(id: string): Promise<MediaAsset>;
   getVideo(id: string): Promise<VideoSource>;
@@ -40,6 +41,7 @@ export interface DesktopAPI {
   saveDraftAs(id: string): Promise<Draft>;
   deleteDraft(id: string): Promise<void>;
   deleteLibraryItems(items: LibraryItemRef[]): Promise<{ count: number }>;
+  pickMaterials(): Promise<string[]>;
   pickImages(): Promise<string[]>;
   pickVideo(): Promise<string | null>;
   pickDirectory(): Promise<string | null>;

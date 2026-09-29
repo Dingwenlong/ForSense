@@ -4,6 +4,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { Store } from '../src/core/store';
+import { renameWithRetry } from '../src/core/io';
 import { deleteLibraryItems } from '../src/core/library-delete';
 import { makeTestDirectory } from './test-data';
 
@@ -17,7 +18,7 @@ test('batch deletion protects references, rolls back failures and retains all fi
   const original = await asset(), derived = await asset(original.id);
   const refs = [original, derived].map(a => ({ kind: 'asset' as const, id: a.id }));
   let calls = 0;
-  const recycle = async (directory: string) => { calls++; await fs.rename(directory, path.join(root, 'recycled')); };
+  const recycle = async (directory: string) => { calls++; await renameWithRetry(directory, path.join(root, 'recycled')); };
   await assert.rejects(deleteLibraryItems(store, [refs[0]], recycle), /仍引用/);
   const draft = await store.create('moments'); await store.save({ ...draft, items: [derived] });
   await assert.rejects(deleteLibraryItems(store, refs, recycle), /仍用于草稿/);

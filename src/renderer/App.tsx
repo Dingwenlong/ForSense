@@ -109,8 +109,9 @@ export function App() {
     setAssetPicker(null); openPage('optimization');
   });
   const importToLibrary = () => void perform(async () => {
-    const paths = await window.desktop.pickImages(); if (!paths.length) return;
-    await run<MediaAsset[]>('images', paths); setNotice({ text: `已保存 ${paths.length} 张图片到素材库` });
+    const paths = await window.desktop.pickMaterials(); if (!paths.length) return;
+    const result = await run<{ images: number; videos: number }>('materials', paths);
+    setNotice({ text: `已导入 ${result.images} 张图片、${result.videos} 个视频副本` });
   });
   const importOptimizationSource = () => void perform(async () => {
     const paths = await window.desktop.pickImages(); if (!paths.length) return;

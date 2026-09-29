@@ -1,0 +1,46 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
+import { Store } from '../src/core/store';
+import { MediaService } from '../src/core/service';
+import { runProcess } from '../src/core/process';
+import { durationHMS } from '../src/shared/media-time';
+import { makeTestDirectory } from './test-data';
+
+const tools = { ffmpeg: path.resolve('resources/media/ffmpeg.exe'), ffprobe: path.resolve('resources/media/ffprobe.exe') };
+test('mixed imports copy originals, preserve video favorites and roll back failed or cancelled batches', async () => {
+  const root = await makeTestDirectory('mixed-materials-'), store = new Store(path.join(root, 'library')); await store.init();
+  const service = new MediaService(store, tools, () => {}), signal = new AbortController().signal;
+  const image = path.join(root, '中文图片.PNG'), video = path.join(root, '中文视频.MP4'), broken = path.join(root, '损坏.MOV');
+  await runProcess(tools.ffmpeg, ['-v', 'error', '-f', 'lavfi', '-i', 'color=red:size=120x80', '-frames:v', '1', '-update', '1', image], signal);
+  await runProcess(tools.ffmpeg, ['-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=120x80:rate=10:duration=0.6', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', video], signal);
+  await fs.writeFile(broken, 'invalid video');
+  const imageBytes = await fs.readFile(image), videoBytes = await fs.readFile(video);
+  assert.deepEqual(await service.execute('materials', [image, video], signal, () => {}), { images: 1, videos: 1 });
+  const library = await store.library(), asset = library.assets[0], source = library.videos[0];
+  assert.equal(library.assets.length, 1); assert.equal(library.videos.length, 1);
+  assert.deepEqual(await fs.readFile(path.join(store.directory('assets', asset.id), 'original.png')), imageBytes);
+  assert.deepEqual(await fs.readFile(path.join(store.directory('sources', source.id), 'original.mp4')), videoBytes);
+  const legacy = await store.source(source.id); delete legacy.createdAt;
+  await fs.writeFile(path.join(store.directory('sources', source.id), 'source.json'), JSON.stringify(legacy));
+  assert.ok((await store.publicSource(source.id)).createdAt);
+  await store.updateVideo(source.id, { favorite: true });
+  const reopened = new Store(store.root); await reopened.init();
+  assert.equal((await reopened.library()).videos[0].favorite, true);
+  assert.deepEqual((await reopened.source(source.id)).frames, legacy.frames);
+  await assert.rejects(store.updateVideo(source.id, { videoFile: '../../outside' }));
+  const snapshot = async () => ({ assets: await fs.readdir(path.join(store.root, 'assets')), sources: await fs.readdir(path.join(store.root, 'sources')) });
+  const before = await snapshot();
+  await assert.rejects(service.execute('materials', [image, video, broken], signal, () => {}));
+  assert.deepEqual(await snapshot(), before);
+  const controller = new AbortController();
+  await assert.rejects(service.execute('materials', [image, video], controller.signal, progress => { if (progress >= 0.5) controller.abort(); }), /取消/);
+  assert.deepEqual(await snapshot(), before);
+  assert.deepEqual(await fs.readFile(image), imageBytes); assert.deepEqual(await fs.readFile(video), videoBytes);
+});
+test('video duration displays hours, minutes and whole seconds without wrapping hours', () => {
+  assert.equal(durationHMS(0.6), '00:00:00'); assert.equal(durationHMS(61.8), '00:01:01');
+  assert.equal(durationHMS(3661.9), '01:01:01'); assert.equal(durationHMS(360000), '100:00:00');
+  assert.equal(durationHMS(Number.NaN), '00:00:00'); assert.equal(durationHMS(-1), '00:00:00');
+});
