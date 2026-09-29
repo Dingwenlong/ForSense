@@ -73,7 +73,6 @@ export function AssetBrowser({ busy, refreshKey, mode = 'manage', excludeIds = [
     {detail && <section ref={detailRef} className="material-detail" aria-label="素材详情">
       <h3>素材详情</h3>
       {detail.kind === 'live' && <video className="material-live-preview" src={detail.videoUrl} controls/>}
-      <p>{detail.name} · {detail.usedBy.length ? `用于：${detail.usedBy.join('、')}` : '尚未用于草稿'}</p>
       <div className="controls">
         {editingName ? <form className="controls" onSubmit={e => { e.preventDefault(); if (!busy && name.trim()) update(detail.id, { name }, () => setEditingName(false)); }} onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); if (!busy) { setName(detail.name); setEditingName(false); } } }}>
           <label>素材名称 <input autoFocus disabled={busy} aria-label="素材名称" maxLength={240} value={name} onChange={e => setName(e.target.value)}/></label>
