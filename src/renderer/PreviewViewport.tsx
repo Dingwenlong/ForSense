@@ -35,6 +35,14 @@ export function PreviewSizeControls({ settings, bounds, onChange, disabled }: { 
     if (size !== applied[axis]) onChange({ ...applied, preset: 'custom', [axis]: size });
   }
   return <div ref={root} className="preview-size-controls" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false); }}>
+    <button ref={trigger} className="preview-size-trigger" type="button" disabled={disabled} aria-label="预览尺寸与机型" aria-haspopup="listbox" aria-expanded={open} aria-controls={`${panelId}-options`}
+      title="设置预览尺寸与机型" onClick={() => setOpen(value => !value)} onKeyDown={event => {
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); setOpen(true); }
+      }}>
+      <span>{options[selected].name}</span>
+      <svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor"><path d="m2 4 4 4 4-4"/></svg>
+    </button>
+    <span aria-hidden="true">·</span>
     <div className="preview-size-fields">
       {(['width', 'height'] as const).map((axis, index) => <label className="preview-dimension" key={axis}>
         <span>{index ? '高' : '宽'}</span>
@@ -43,15 +51,7 @@ export function PreviewSizeControls({ settings, bounds, onChange, disabled }: { 
           onChange={event => update(axis, event.target.value, false)} onBlur={event => update(axis, event.target.value, true)}
           onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); update(axis, event.currentTarget.value, true); } }}/>
       </label>)}
-      <span aria-hidden="true">·</span>
     </div>
-    <button ref={trigger} className="preview-size-trigger" type="button" disabled={disabled} aria-label="预览尺寸与机型" aria-haspopup="listbox" aria-expanded={open} aria-controls={`${panelId}-options`}
-      title="设置预览尺寸与机型" onClick={() => setOpen(value => !value)} onKeyDown={event => {
-        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); setOpen(true); }
-      }}>
-      <span>{options[selected].name}</span>
-      <svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor"><path d="m2 4 4 4 4-4"/></svg>
-    </button>
     {open && <div id={panelId} className="preview-size-panel" role="group" aria-label="预览尺寸设置">
       <div id={`${panelId}-options`} role="listbox" aria-label="预览机型" onKeyDown={event => {
         const index = event.key === 'ArrowDown' ? (focused + 1) % options.length : event.key === 'ArrowUp' ? (focused - 1 + options.length) % options.length : event.key === 'Home' ? 0 : event.key === 'End' ? options.length - 1 : -1;

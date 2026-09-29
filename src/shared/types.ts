@@ -2,10 +2,11 @@ export type Platform = 'moments' | 'douyin';
 export const MAX_DRAFTS = 10;
 export interface Crop { x: number; y: number; width: number; height: number }
 export interface Edits { rotation: 0 | 90 | 180 | 270; crop?: Crop }
+export type MediaOrigin = 'import' | 'crop' | 'rotate' | 'edit' | 'video-frame' | 'live' | 'optimization' | 'unknown';
 export interface MediaAsset {
   id: string; kind: 'image' | 'live'; name: string; width: number; height: number;
   imageUrl: string; videoUrl?: string; duration?: number; coverTime?: number;
-  originalId: string; edits: Edits;
+  originalId: string; edits: Edits; origin?: MediaOrigin;
   createdAt?: string; favorite?: boolean; archived?: boolean;
   optimization?: { sourceId: string; templateId: string; prompt: string; importedAt: string };
 }

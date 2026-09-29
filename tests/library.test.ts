@@ -85,12 +85,14 @@ test('global library preserves shared drafts, migrates old records and retains m
   const resultFile = path.join(root, '手动优化.png');
   await runProcess(tools.ffmpeg, ['-v', 'error', '-f', 'lavfi', '-i', 'color=yellow:size=160x100', '-frames:v', '1', '-update', '1', resultFile], signal);
   const result = await service.execute('optimization', { sourceId: original.id, path: resultFile, templateId: 'natural', prompt: '自然提亮，保留原图。🌤' }, signal, report) as MediaAsset;
+  assert.equal(original.origin, 'import'); assert.equal(result.origin, 'optimization');
   assert.notEqual(result.id, original.id); assert.equal(result.originalId, result.id);
   assert.equal(result.width, 160); assert.equal(result.optimization?.sourceId, original.id);
   assert.equal(result.optimization?.prompt, '自然提亮，保留原图。🌤');
   assert.equal((await new Store(store.root).asset(result.id)).optimization?.templateId, 'natural');
   assert.deepEqual(await fs.readFile(await store.assetPath(original.id, 'image')), originalBytes);
   const cropped = await service.execute('edit', { id: result.id, edits: { rotation: 90 } }, signal, report) as MediaAsset;
+  assert.equal(cropped.origin, 'rotate');
   assert.equal(cropped.originalId, result.id); assert.equal(cropped.width, 100);
   assert.equal(cropped.optimization?.sourceId, original.id);
   const beforeFailure = await fs.readdir(path.join(store.root, 'assets'));

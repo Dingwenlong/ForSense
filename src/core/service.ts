@@ -116,7 +116,7 @@ export class MediaService {
           await fs.copyFile(file, path.join(dir, original));
           await transcode(this.tools, ['-i', path.join(dir, original), '-frames:v', '1', '-vf', 'setsar=1', '-update', '1', path.join(dir, 'image.png')], 0, signal, () => {});
           const p = await probe(this.tools, path.join(dir, 'image.png'), signal);
-          return { id, name: path.basename(file), kind: 'image', width: p.width, height: p.height, originalId: id, edits: { rotation: 0 }, imageFile: 'image.png', optimization };
+          return { id, name: path.basename(file), kind: 'image', width: p.width, height: p.height, originalId: id, edits: { rotation: 0 }, imageFile: 'image.png', optimization, origin: optimization ? 'optimization' : 'import' };
         }, signal);
         result.push(item); report((n + 1) / paths.length, `已导入 ${n + 1} / ${paths.length} 张图片`);
       }
@@ -152,7 +152,7 @@ export class MediaService {
     return this.makeAsset(async (id, dir) => {
       await transcode(this.tools, ['-i', await this.store.sourcePath(sourceId), '-ss', frameTime.toFixed(6), '-frames:v', '1', '-update', '1', path.join(dir, 'image.png')], 0, signal, () => {});
       report(1, '已截取画面');
-      return { id, kind: 'image', name: `${source.name} · ${frameTime.toFixed(2)}秒`, width: source.width, height: source.height, originalId: id, edits: { rotation: 0 }, imageFile: 'image.png' };
+      return { id, kind: 'image', origin: 'video-frame', name: `${source.name} · ${frameTime.toFixed(2)}秒`, width: source.width, height: source.height, originalId: id, edits: { rotation: 0 }, imageFile: 'image.png' };
     }, signal);
   }
   async live(p: { sourceId: string; start: number; end: number; cover: number; mute: boolean }, signal: AbortSignal, report: Report) {
@@ -168,7 +168,7 @@ export class MediaService {
       const meta = await probe(this.tools, path.join(dir, 'video.mp4'), signal);
       const cover = Math.max(0, Math.min(Math.round((p.cover - p.start) * 30) / 30, Math.floor(Math.max(0, meta.duration * 30 - 1)) / 30));
       await transcode(this.tools, ['-i', path.join(dir, 'video.mp4'), '-ss', cover.toFixed(6), '-frames:v', '1', '-q:v', '2', '-update', '1', path.join(dir, 'image.jpg')], 0, signal, () => {});
-      return { id, kind: 'live', name: `${source.name} · 实况`, width: meta.width, height: meta.height, duration: meta.duration, coverTime: cover, originalId: id, edits: { rotation: 0 }, imageFile: 'image.jpg', videoFile: 'video.mp4' };
+      return { id, kind: 'live', origin: 'live', name: `${source.name} · 实况`, width: meta.width, height: meta.height, duration: meta.duration, coverTime: cover, originalId: id, edits: { rotation: 0 }, imageFile: 'image.jpg', videoFile: 'video.mp4' };
     }, signal);
   }
   async edit(assetId: string, edits: Edits, signal: AbortSignal, report: Report) {
@@ -183,7 +183,7 @@ export class MediaService {
         await transcode(this.tools, ['-i', path.join(dir, videoFile), '-ss', (original.coverTime || 0).toFixed(6), '-frames:v', '1', '-q:v', '2', '-update', '1', path.join(dir, imageFile)], 0, signal, () => {});
       } else await transcode(this.tools, ['-i', await this.store.assetPath(original.id, 'image'), '-vf', filter.join(','), '-frames:v', '1', '-update', '1', path.join(dir, imageFile)], 0, signal, () => {});
       const meta = await probe(this.tools, path.join(dir, imageFile), signal);
-      return { ...original, id, originalId: original.id, edits, width: meta.width, height: meta.height, imageFile, videoFile, createdAt: new Date().toISOString(), archived: false };
+      return { ...original, id, originalId: original.id, edits, origin: edits.crop ? 'crop' : 'rotate', width: meta.width, height: meta.height, imageFile, videoFile, createdAt: new Date().toISOString(), archived: false };
     }, signal);
   }
   async export(options: { draftId: string; directory: string; format: 'folder' | 'zip'; targets: ('apple' | 'android')[] }, signal: AbortSignal, report: Report) {

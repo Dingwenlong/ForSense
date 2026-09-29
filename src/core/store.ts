@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { Draft, Edits, MediaAsset, Platform, VideoSource, LibrarySnapshot } from '../shared/types';
 import { MAX_DRAFTS } from '../shared/types';
+import { metadataOrigin } from '../shared/media-origin';
 import { draftName } from '../shared/draft-name';
 import { atomicJSON, inside } from './io';
 import { recoverLibraryDeletes } from './library-delete';
@@ -17,7 +18,7 @@ export const draftInput = z.object({ version: z.literal(1), id: uuid, platform: 
 export interface AssetRecord {
   id: string; kind: 'image' | 'live'; name: string; width: number; height: number;
   originalId: string; edits: Edits; imageFile: string; videoFile?: string; duration?: number; coverTime?: number;
-  createdAt?: string; favorite?: boolean; archived?: boolean; optimization?: MediaAsset['optimization'];
+  origin?: MediaAsset['origin']; createdAt?: string; favorite?: boolean; archived?: boolean; optimization?: MediaAsset['optimization'];
 }
 export interface SourceRecord { id: string; name: string; videoFile: string; duration: number; width: number; height: number; frames: number[]; hasAudio: boolean; favorite?: boolean; createdAt?: string }
 
@@ -32,11 +33,14 @@ export class Store {
     const record = JSON.parse(await fs.readFile(path.join(this.directory('assets', id), 'asset.json'), 'utf8')) as AssetRecord;
     if (record.id !== id || !['image', 'live'].includes(record.kind)) throw new Error('素材记录损坏');
     for (const file of [record.imageFile, record.videoFile].filter(Boolean) as string[]) inside(this.directory('assets', id), file);
-    return record;
+    const origin = metadataOrigin(record);
+    if (origin !== 'unknown') return { ...record, origin };
+    const hasOriginal = (await fs.readdir(this.directory('assets', id), { withFileTypes: true })).some(file => file.isFile() && /^original\.(jpg|jpeg|png|webp)$/i.test(file.name));
+    return { ...record, origin: hasOriginal ? 'import' : 'unknown' };
   }
   publicAsset(record: AssetRecord): MediaAsset {
     const { imageFile, videoFile, ...asset } = record;
-    return { ...asset, imageUrl: `media://asset/${record.id}/image`, videoUrl: videoFile ? `media://asset/${record.id}/video` : undefined };
+    return { ...asset, origin: metadataOrigin(record), imageUrl: `media://asset/${record.id}/image`, videoUrl: videoFile ? `media://asset/${record.id}/video` : undefined };
   }
   async writeAsset(record: AssetRecord) {
     record = { ...record, createdAt: record.createdAt || new Date().toISOString() };

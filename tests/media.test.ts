@@ -24,10 +24,13 @@ test('Windows media pipeline: frame, paired Live Photo, Motion Photo, edits, per
   const source = await service.execute('video', input, signal, report) as VideoSource;
   assert.equal(source.frames.length, 120); assert.equal(source.hasAudio, true);
   const frame = await service.execute('frame', { sourceId: source.id, time: 1 }, signal, report) as MediaAsset;
+  assert.equal(frame.origin, 'video-frame');
   assert.equal(frame.width, 320); assert.equal(frame.height, 240);
   const live = await service.execute('live', { sourceId: source.id, start: 0.5, end: 3.5, cover: 2, mute: false }, signal, report) as MediaAsset;
+  assert.equal(live.origin, 'live');
   assert.ok(live.duration! <= 3.05); assert.equal(live.coverTime, 1.5);
   const edited = await service.execute('edit', { id: frame.id, edits: { rotation: 90, crop: { x: 0, y: 0, width: 0.5, height: 1 } } }, signal, report) as MediaAsset;
+  assert.equal(edited.origin, 'crop');
   assert.equal(edited.width, 120); assert.equal(edited.height, 320);
   const draft = await store.create('moments'); draft.caption = '海边散步 🌊\n第二行'; draft.items = [edited, live]; await store.save(draft);
   const loaded = await new Store(store.root).load(draft.id); assert.equal(loaded.caption, draft.caption); assert.deepEqual(loaded.items.map(i => i.id), [edited.id, live.id]);

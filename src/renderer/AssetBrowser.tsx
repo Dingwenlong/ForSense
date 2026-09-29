@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { LibrarySnapshot, MediaAsset, LibraryItemRef } from '../shared/types';
 import { errorText } from './hooks';
+import { originLabel } from '../shared/media-origin';
 import { durationHMS } from '../shared/media-time';
 
 export function AssetBrowser({ busy, refreshKey, mode = 'manage', excludeIds = [], onImport, onUse, onOptimize, onVideo, onDelete, canCreateDraft = true, perform }: {
@@ -36,8 +37,8 @@ export function AssetBrowser({ busy, refreshKey, mode = 'manage', excludeIds = [
   const detail = data.assets.find(a => a.id === detailId);
   const visible = data.assets.filter(a => (mode !== 'ai' || a.kind === 'image') &&
     (filter === 'all' || filter === 'favorites' && a.favorite || filter === 'ai' && a.optimization || filter === a.kind) &&
-    matches(`${a.name} ${a.optimization?.prompt || ''}`));
-  const visibleVideos = mode === 'manage' ? data.videos.filter(video => (filter === 'all' || filter === 'video' || filter === 'favorites' && video.favorite) && matches(video.name)) : [];
+    matches(`${a.name} ${a.optimization?.prompt || ''} ${originLabel(a.origin)}`));
+  const visibleVideos = mode === 'manage' ? data.videos.filter(video => (filter === 'all' || filter === 'video' || filter === 'favorites' && video.favorite) && matches(`${video.name} 用户导入`)) : [];
   const cards = [...visible.map(asset => ({ type: 'asset' as const, asset, createdAt: asset.createdAt || '' })), ...visibleVideos.map(video => ({ type: 'video' as const, video, createdAt: video.createdAt || '' }))].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const updateVideoFavorite = (id: string, favorite: boolean) => perform(async () => {
     const changed = await window.desktop.updateVideo(id, { favorite });
@@ -63,7 +64,7 @@ export function AssetBrowser({ busy, refreshKey, mode = 'manage', excludeIds = [
       {filter !== 'all' && <span className="draft-search-tag">{categoryName}
         <button aria-label={`移除${categoryName}标签`} onClick={() => { setFilter('all'); searchRef.current?.focus(); }}>×</button>
       </span>}
-      <input ref={searchRef} aria-label="搜索素材" type="search" value={query} placeholder="搜索名称或优化提示词，可先选择分类标签" onChange={e => setQuery(e.target.value)}
+      <input ref={searchRef} aria-label="搜索素材" type="search" value={query} placeholder="搜索名称、来源或提示词，可先选择分类标签" onChange={e => setQuery(e.target.value)}
         onKeyDown={e => { if (e.key === 'Backspace' && !query && filter !== 'all' && !e.nativeEvent.isComposing) { e.preventDefault(); setFilter('all'); } }}/>
       {(query || filter !== 'all') && <button className="draft-search-clear" aria-label="清空素材搜索" onClick={() => { setQuery(''); setFilter('all'); searchRef.current?.focus(); }}>×</button>}
     </div>
@@ -74,7 +75,7 @@ export function AssetBrowser({ busy, refreshKey, mode = 'manage', excludeIds = [
       <div className="material-grid">
         {cards.map(card => {
           if (card.type === 'video') { const video = card.video; return <article key={`video:${video.id}`} className={`material-card material-video-card ${detailVideoId === video.id ? 'material-card-active' : ''}`}>
-            <button className="material-thumbnail" disabled={busy} aria-expanded={detailVideoId === video.id} aria-label={`查看素材 ${video.name}`} onClick={() => inspectVideo(video.id)}><video src={video.videoUrl} muted preload="metadata" tabIndex={-1}/></button>
+            <button className="material-thumbnail" disabled={busy} aria-expanded={detailVideoId === video.id} aria-label={`查看素材 ${video.name}`} onClick={() => inspectVideo(video.id)}><video src={video.videoUrl} muted preload="metadata" tabIndex={-1}/><span className="material-origin">用户导入</span></button>
             <strong title={video.name}>{video.name}</strong>
             <div className="material-metadata"><span aria-label="视频时长">{durationHMS(video.duration)}</span>
               <FavoriteButton favorite={!!video.favorite} disabled={busy} onClick={() => updateVideoFavorite(video.id, !video.favorite)}/>
@@ -83,9 +84,9 @@ export function AssetBrowser({ busy, refreshKey, mode = 'manage', excludeIds = [
           </article>; }
           const asset = card.asset;
           return <article key={asset.id} className={`material-card ${detailId === asset.id ? 'material-card-active' : ''}`}>
-          <button className="material-thumbnail" disabled={busy} aria-expanded={detailId === asset.id} aria-label={`查看素材 ${asset.name}`} onClick={() => inspect(asset.id)}><img loading="lazy" src={asset.imageUrl} alt={asset.name}/></button>
+          <button className="material-thumbnail" disabled={busy} aria-expanded={detailId === asset.id} aria-label={`查看素材 ${asset.name}`} onClick={() => inspect(asset.id)}><img loading="lazy" src={asset.imageUrl} alt={asset.name}/><span className="material-origin" data-origin={asset.origin}>{originLabel(asset.origin)}</span></button>
           <strong title={asset.name}>{asset.name}</strong>
-          <div className="material-metadata"><span>{asset.kind === 'live' ? '实况' : asset.optimization ? '优化结果' : '图片'} · {asset.width} × {asset.height}</span>
+          <div className="material-metadata"><span>{asset.kind === 'live' ? '实况' : '图片'} · {asset.width} × {asset.height}</span>
             {mode !== 'pick' && <FavoriteButton favorite={!!asset.favorite} disabled={busy} onClick={() => update(asset.id, { favorite: !asset.favorite })}/>}
           </div>
           <div className="controls">
@@ -101,12 +102,12 @@ export function AssetBrowser({ busy, refreshKey, mode = 'manage', excludeIds = [
       {!cards.length && <p className="library-empty">{query || filter !== 'all' ? '没有符合条件的素材，试试其他关键词或分类。' : '素材库是空的。请先导入素材，所有草稿都可复用。'}</p>}
     </>}
     {videoDetail && <section ref={detailRef} className="material-detail" aria-label="素材详情">
-      <h3>素材详情</h3>
+      <h3>素材详情 <small className="material-origin-inline">用户导入</small></h3>
       <video className="material-live-preview" src={videoDetail.videoUrl} controls/>
       <div className="controls"><span>素材名称 {videoDetail.name}</span><button disabled={busy} onClick={() => onVideo(videoDetail.id)}>取材</button></div>
     </section>}
     {detail && <section ref={detailRef} className="material-detail" aria-label="素材详情">
-      <h3>素材详情</h3>
+      <h3>素材详情 <small className="material-origin-inline">{originLabel(detail.origin)}</small></h3>
       {detail.kind === 'live' && <video className="material-live-preview" src={detail.videoUrl} controls/>}
       <div className="controls">
         {editingName ? <form className="controls" onSubmit={e => { e.preventDefault(); if (!busy && name.trim()) update(detail.id, { name }, () => setEditingName(false)); }} onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); if (!busy) { setName(detail.name); setEditingName(false); } } }}>

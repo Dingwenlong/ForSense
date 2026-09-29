@@ -304,3 +304,7 @@ img, video { max-width: 100%; }
   .moments-finished__avatar { width: 32px; height: 32px; font-size: 16px; }
   .moments-finished__caption, .moments-finished__name { font-size: 16px; }
 }
+
+.material-thumbnail { position: relative; }
+.material-origin { position: absolute; left: 4px; top: 4px; padding: 2px 5px; border: 1px solid #ccc; border-radius: 2px; background: rgb(255 255 255 / 94%); color: #333; font-size: 11px; font-weight: normal; line-height: 1.4; pointer-events: none; }
+.material-origin-inline { margin-left: 8px; color: #666; font-size: 12px; font-weight: normal; }
