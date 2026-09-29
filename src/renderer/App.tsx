@@ -4,6 +4,7 @@ import { MAX_DRAFTS } from '../shared/types';
 import { draftName } from '../shared/draft-name';
 import { DEFAULT_PREVIEW, PREVIEW_STORAGE_KEY, normalizePreviewSettings } from '../shared/preview-settings';
 import { useJobs, errorText } from './hooks';
+import { WindowTitleBar } from './WindowTitleBar';
 import { Modal } from './Modal';
 import { CropEditor } from './CropEditor';
 import { VideoTool } from './VideoTool';
@@ -142,13 +143,14 @@ export function App() {
     onDelete={mode === 'manage' ? setDeleteItems : undefined}
     onOptimize={mode === 'manage' ? openOptimization : undefined} onVideo={openLibraryVideo} perform={action => void perform(action)}/>;
   return <div className="app-shell">
-    <header className="app-header">
+    <WindowTitleBar onError={text => setNotice({ text, error: true })}>
       {page !== 'library' && <BackButton disabled={working || loading} onClick={goBack}/>}
       <strong>片语</strong>
+      <div className="window-drag-region" aria-hidden="true"/>
       {page !== 'assets' && <nav className="controls" aria-label="工作区导航">
         <button aria-pressed={page === 'optimization'} disabled={working} onClick={() => navigate('assets')}>素材库</button>
       </nav>}
-    </header>
+    </WindowTitleBar>
     <main ref={pageBody} className="page-body">
       {loading ? <p role="status">正在加载草稿…</p> : page === 'assets' ? <section className="page-content" aria-label="素材库">
         <h1>素材库</h1><p className="destination-path library-storage-path" role={directoryError ? 'alert' : undefined}>图片保存位置：{assetDirectory ? <button className="library-directory-link" disabled={working} aria-label="打开素材所在文件夹" onClick={() => void perform(() => window.desktop.openAssetDirectory())}>{assetDirectory}</button> : directoryError ? `读取失败，${directoryError}` : '正在读取…'}</p>{renderAssets('manage')}

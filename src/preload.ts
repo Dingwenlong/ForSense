@@ -1,6 +1,9 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
-import type { DesktopAPI, ExportJob } from './shared/types';
+import type { DesktopAPI, ExportJob, DesktopWindowState } from './shared/types';
 const api: DesktopAPI = {
+  getWindowState: () => ipcRenderer.invoke('window:state'),
+  windowAction: action => ipcRenderer.invoke('window:action', action),
+  onWindowState: callback => { const handler = (_: unknown, state: DesktopWindowState) => callback(state); ipcRenderer.on('window:state-changed', handler); return () => ipcRenderer.removeListener('window:state-changed', handler); },
   deleteLibraryItems: items => ipcRenderer.invoke('library:delete', items),
   listLibrary: () => ipcRenderer.invoke('library:list'),
   updateVideo: (id, patch) => ipcRenderer.invoke('library:video-update', id, patch),

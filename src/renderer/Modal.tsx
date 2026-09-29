@@ -1,7 +1,9 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
+import { registerModal } from './modalState';
 import { BackButton } from './BackButton';
 export function Modal({ title, children, onClose, wide = false, busy = false }: { title: string; children: ReactNode; onClose: () => void; wide?: boolean; busy?: boolean }) {
+  useLayoutEffect(registerModal, []);
   const ref = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose); closeRef.current = onClose;
   useEffect(() => {
@@ -13,6 +15,7 @@ export function Modal({ title, children, onClose, wide = false, busy = false }: 
         const list = ref.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex="0"]');
         if (!list?.length) return;
         const first = list[0], last = list[list.length - 1];
+        if (document.activeElement?.closest('.window-controls')) { event.preventDefault(); (event.shiftKey ? last : first).focus(); return; }
         if (event.shiftKey && (document.activeElement === first || document.activeElement === ref.current)) { event.preventDefault(); last.focus(); }
         else if (!event.shiftKey && (document.activeElement === last || document.activeElement === ref.current)) { event.preventDefault(); first.focus(); }
       }

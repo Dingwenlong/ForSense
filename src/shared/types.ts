@@ -29,7 +29,12 @@ export interface ExportJob {
   id: string; kind: JobKind; title: string; status: 'queued' | 'running' | 'done' | 'error' | 'cancelled';
   progress: number; message: string; result?: unknown; error?: string;
 }
+export interface DesktopWindowState { maximized: boolean; focused: boolean }
+export type WindowAction = 'minimize' | 'toggle-maximize' | 'close';
 export interface DesktopAPI {
+  getWindowState(): Promise<DesktopWindowState>;
+  windowAction(action: WindowAction): Promise<void>;
+  onWindowState(callback: (state: DesktopWindowState) => void): () => void;
   listLibrary(): Promise<LibrarySnapshot>;
   updateVideo(id: string, patch: { favorite: boolean }): Promise<VideoSource>;
   updateAsset(id: string, patch: AssetUpdate): Promise<MediaAsset>;
