@@ -255,3 +255,11 @@ img, video { max-width: 100%; }
 .favorite-button:focus-visible { outline: 2px solid Highlight; }
 
 .wechat-proof__caption:focus, .douyin-proof__caption-editor:focus { outline: none; box-shadow: none; }
+
+.material-selection-bar { position: relative; display: flex; align-items: center; width: 100%; height: 28px; }
+.material-selection-bar input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.material-selection-bar > span { width: 100%; height: 8px; border: 1px solid #1677ff; border-radius: 4px; background: transparent; pointer-events: none; }
+.material-selection-bar input:checked + span { background: #1677ff; }
+.material-selection-bar input:focus-visible + span { outline: 2px solid #333; outline-offset: 3px; }
+.material-selection-bar input:disabled { cursor: not-allowed; }
+.material-selection-bar input:disabled + span { opacity: .45; }

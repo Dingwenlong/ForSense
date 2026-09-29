@@ -38,7 +38,7 @@ export function AssetBrowser({ busy, refreshKey, mode = 'manage', excludeIds = [
       <label>分类 <select aria-label="素材分类" value={filter} onChange={e => setFilter(e.target.value)}>
         <option value="all">全部图片与实况</option><option value="image">图片</option>
         {mode !== 'ai' && <option value="live">实况</option>}
-        <option value="favorites">收藏</option><option value="ai">优化结果</option>
+        {mode !== 'pick' && <option value="favorites">收藏</option>}<option value="ai">优化结果</option>
         {mode === 'manage' && <option value="video">视频</option>}
       </select></label>
     </div>
@@ -53,18 +53,22 @@ export function AssetBrowser({ busy, refreshKey, mode = 'manage', excludeIds = [
       </article>)}
       {!data.videos.length && <p>还没有视频。导入后可以多次截图或制作实况。</p>}
     </div> : <>
-      <p className="asset-library-count">{visible.length} 个素材{mode === 'pick' ? ' · 勾选后加入当前草稿，已有素材不会重复添加。' : mode === 'ai' ? ' · 选择一张静态图片。' : ''}</p>
+      <p className="asset-library-count">{visible.length} 个素材{mode === 'pick' ? ' · 点击选择条后加入当前草稿，已有素材不会重复添加。' : mode === 'ai' ? ' · 选择一张静态图片。' : ''}</p>
       <div className="material-grid">
         {visible.map(asset => <article key={asset.id} className={`material-card ${detailId === asset.id ? 'material-card-active' : ''}`}>
           <button className="material-thumbnail" disabled={busy} aria-expanded={detailId === asset.id} aria-label={`查看素材 ${asset.name}`} onClick={() => inspect(asset.id)}><img loading="lazy" src={asset.imageUrl} alt={asset.name}/></button>
           <strong title={asset.name}>{asset.name}</strong>
           <span>{asset.kind === 'live' ? '实况' : asset.optimization ? '优化结果' : '图片'} · {asset.width} × {asset.height}</span>
           <div className="controls">
-            {mode === 'ai' ? <button disabled={busy} onClick={() => onUse?.([asset])}>选择此图</button> : (mode === 'manage' || onUse) && <label>
-              <input type="checkbox" aria-label={`选择 ${asset.name}`} disabled={busy || (mode === 'pick' && excludeIds.includes(asset.id))} checked={(mode === 'pick' && excludeIds.includes(asset.id)) || selected.includes(asset.id)} onChange={e => setSelected(e.target.checked ? [...selected, asset.id] : selected.filter(id => id !== asset.id))}/>
-              {(mode === 'pick' && excludeIds.includes(asset.id)) ? '已在草稿' : '选择'}
+            {mode === 'pick' ? <label className="material-selection-bar">
+              <input type="checkbox" aria-label={`选择 ${asset.name}`} aria-description={excludeIds.includes(asset.id) ? '已在草稿' : undefined}
+                disabled={busy || excludeIds.includes(asset.id)} checked={excludeIds.includes(asset.id) || selected.includes(asset.id)}
+                onChange={e => setSelected(e.target.checked ? [...selected, asset.id] : selected.filter(id => id !== asset.id))}/>
+              <span aria-hidden="true"/>
+            </label> : mode === 'ai' ? <button disabled={busy} onClick={() => onUse?.([asset])}>选择此图</button> : <label>
+              <input type="checkbox" aria-label={`选择 ${asset.name}`} disabled={busy} checked={selected.includes(asset.id)} onChange={e => setSelected(e.target.checked ? [...selected, asset.id] : selected.filter(id => id !== asset.id))}/>选择
             </label>}
-            <button className="favorite-button" disabled={busy} aria-label={asset.favorite ? '取消收藏' : '收藏'} title={asset.favorite ? '取消收藏' : '收藏'} aria-pressed={!!asset.favorite} onClick={() => update(asset.id, { favorite: !asset.favorite })}><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill={asset.favorite ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.6"><path d="m12 3 2.78 5.63 6.22.91-4.5 4.39 1.06 6.2L12 17.2l-5.56 2.93 1.06-6.2L3 9.54l6.22-.91Z"/></svg></button>
+            {mode !== 'pick' && <button className="favorite-button" disabled={busy} aria-label={asset.favorite ? '取消收藏' : '收藏'} title={asset.favorite ? '取消收藏' : '收藏'} aria-pressed={!!asset.favorite} onClick={() => update(asset.id, { favorite: !asset.favorite })}><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill={asset.favorite ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.6"><path d="m12 3 2.78 5.63 6.22.91-4.5 4.39 1.06 6.2L12 17.2l-5.56 2.93 1.06-6.2L3 9.54l6.22-.91Z"/></svg></button>}
           </div>
         </article>)}
       </div>
