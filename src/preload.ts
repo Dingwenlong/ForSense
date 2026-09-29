@@ -21,6 +21,7 @@ const api: DesktopAPI = {
   onJob: callback => { const handler = (_: unknown, job: ExportJob) => callback(job); ipcRenderer.on('jobs:update', handler); return () => ipcRenderer.removeListener('jobs:update', handler); },
   copyText: text => ipcRenderer.invoke('clipboard:write', text),
   reveal: path => ipcRenderer.invoke('shell:reveal', path),
+  openAssetDirectory: () => ipcRenderer.invoke('shell:asset-directory'),
   openHelp: () => ipcRenderer.invoke('help:open'),
   getInfo: () => ipcRenderer.invoke('app:info'),
   onClose: callback => { ipcRenderer.on('app:closing', callback); return () => ipcRenderer.removeListener('app:closing', callback); },

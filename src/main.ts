@@ -103,6 +103,11 @@ if (ownsLock && !started) app.whenReady().then(async () => {
     await writeClipboardVerified(() => clipboard.writeText(text), async () => await clipboard.readText() === text);
   });
   register('shell:reveal', file => { if (!service.exported.has(file)) throw new Error('只能打开本次导出的素材位置'); shell.showItemInFolder(file); });
+  register('shell:asset-directory', async () => {
+    const directory = path.join(root, 'assets');
+    const error = await shell.openPath(directory);
+    if (error) throw new Error('无法打开素材目录，请确认目录存在且资源管理器可用');
+  });
   register('help:open', async () => {
     const help = app.isPackaged ? path.join(process.resourcesPath, '使用说明.md') : path.join(app.getAppPath(), 'docs/使用说明.md');
     const error = await shell.openPath(help); if (error) throw new Error('无法打开使用说明，请在安装目录中查看');

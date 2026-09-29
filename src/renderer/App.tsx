@@ -150,7 +150,7 @@ export function App() {
     </header>
     <main ref={pageBody} className="page-body">
       {loading ? <p role="status">正在加载草稿…</p> : page === 'assets' ? <section className="page-content" aria-label="素材库">
-        <h1>素材库</h1><p className="destination-path library-storage-path" role={directoryError ? 'alert' : undefined}>图片保存位置：{assetDirectory || (directoryError ? `读取失败，${directoryError}` : '正在读取…')}</p>{renderAssets('manage')}
+        <h1>素材库</h1><p className="destination-path library-storage-path" role={directoryError ? 'alert' : undefined}>图片保存位置：{assetDirectory ? <button className="library-directory-link" disabled={working} aria-label="打开素材所在文件夹" onClick={() => void perform(() => window.desktop.openAssetDirectory())}>{assetDirectory}</button> : directoryError ? `读取失败，${directoryError}` : '正在读取…'}</p>{renderAssets('manage')}
       </section> : page === 'optimization' ? <OptimizationPage session={optimization} setSession={setOptimization} busy={working}
         selectImage={() => setAssetPicker('ai')} importImage={importOptimizationSource} copyImage={copyImage} copyPrompt={copyPrompt}
         canUseResult={!!draft && !!optimization.result && !draft.items.some(i => i.id === optimization.result!.id)}

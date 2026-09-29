@@ -13,6 +13,16 @@ export function AssetBrowser({ busy, refreshKey, mode = 'manage', excludeIds = [
   const [query, setQuery] = useState(''), [filter, setFilter] = useState('all'), [selected, setSelected] = useState<string[]>([]), [detailId, setDetailId] = useState<string | null>(null), [name, setName] = useState('');
   const [editingName, setEditingName] = useState(false), [selectedVideos, setSelectedVideos] = useState<string[]>([]);
   const [revision, setRevision] = useState(0);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const keywords = query.trim().toLowerCase().split(/\s+/u).filter(Boolean);
+  const matches = (text: string) => keywords.every(word => text.toLowerCase().includes(word));
+  const categories = [
+    { value: 'all', label: '全部图片与实况' }, { value: 'image', label: '图片' },
+    ...(mode !== 'ai' ? [{ value: 'live', label: '实况' }] : []),
+    ...(mode !== 'pick' ? [{ value: 'favorites', label: '收藏' }] : []),
+    { value: 'ai', label: '优化结果' }, ...(mode === 'manage' ? [{ value: 'video', label: '视频' }] : []),
+  ];
+  const categoryName = categories.find(category => category.value === filter)?.label;
   const detailRef = useRef<HTMLElement>(null);
   useEffect(() => { if (detailId) detailRef.current?.scrollIntoView({ block: 'nearest' }); }, [detailId]);
   useEffect(() => {
@@ -23,7 +33,7 @@ export function AssetBrowser({ busy, refreshKey, mode = 'manage', excludeIds = [
   const detail = data.assets.find(a => a.id === detailId);
   const visible = data.assets.filter(a => (mode !== 'ai' || a.kind === 'image') &&
     (filter === 'all' || filter === 'favorites' && a.favorite || filter === 'ai' && a.optimization || filter === a.kind) &&
-    `${a.name} ${a.optimization?.prompt || ''}`.toLowerCase().includes(query.toLowerCase()));
+    matches(`${a.name} ${a.optimization?.prompt || ''}`));
   const eligible = selected.map(id => data.assets.find(a => a.id === id)).filter((a): a is LibrarySnapshot['assets'][number] => !!a && (mode !== 'pick' || !excludeIds.includes(a.id)));
   const update = (id: string, patch: Parameters<typeof window.desktop.updateAsset>[1], done?: () => void) => perform(async () => {
     const changed = await window.desktop.updateAsset(id, patch);
@@ -35,18 +45,23 @@ export function AssetBrowser({ busy, refreshKey, mode = 'manage', excludeIds = [
     <div className="controls asset-library-tools">
       <button disabled={busy} onClick={onImport}>从电脑导入图片</button>
       {mode === 'manage' && <button disabled={busy} onClick={() => onVideo('')}>从视频取材</button>}
-      <label>搜索素材 <input aria-label="搜索素材" type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="名称或优化提示词"/></label>
-      <label>分类 <select aria-label="素材分类" value={filter} onChange={e => setFilter(e.target.value)}>
-        <option value="all">全部图片与实况</option><option value="image">图片</option>
-        {mode !== 'ai' && <option value="live">实况</option>}
-        {mode !== 'pick' && <option value="favorites">收藏</option>}<option value="ai">优化结果</option>
-        {mode === 'manage' && <option value="video">视频</option>}
-      </select></label>
+    </div>
+    <div className="draft-search material-search" role="search" aria-label="查找素材">
+      <select aria-label="素材分类" value="" onChange={e => { setFilter(e.target.value); searchRef.current?.focus(); }}>
+        <option value="" disabled>＋ 标签</option>
+        {categories.map(category => <option key={category.value} value={category.value}>{category.label}</option>)}
+      </select>
+      {filter !== 'all' && <span className="draft-search-tag">{categoryName}
+        <button aria-label={`移除${categoryName}标签`} onClick={() => { setFilter('all'); searchRef.current?.focus(); }}>×</button>
+      </span>}
+      <input ref={searchRef} aria-label="搜索素材" type="search" value={query} placeholder="搜索名称或优化提示词，可先选择分类标签" onChange={e => setQuery(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Backspace' && !query && filter !== 'all' && !e.nativeEvent.isComposing) { e.preventDefault(); setFilter('all'); } }}/>
+      {(query || filter !== 'all') && <button className="draft-search-clear" aria-label="清空素材搜索" onClick={() => { setQuery(''); setFilter('all'); searchRef.current?.focus(); }}>×</button>}
     </div>
     {error && <p role="alert">{error} <button onClick={() => setRevision(n => n + 1)}>重新加载</button></p>}
     {data.warnings.map((warning, i) => <p role="alert" key={i}>{warning}</p>)}
     {loading ? <p role="status">正在读取素材库…</p> : filter === 'video' ? <div className="material-grid">
-      {data.videos.filter(v => v.name.toLowerCase().includes(query.toLowerCase())).map(v => <article key={v.id} className="material-card">
+      {data.videos.filter(v => matches(v.name)).map(v => <article key={v.id} className="material-card">
         <video src={v.videoUrl} controls preload="metadata"/>
         <strong>{v.name}</strong><span>{v.width} × {v.height} · {v.duration.toFixed(1)} 秒</span>
         <label className="material-selection-bar"><input type="checkbox" aria-label={`选择 ${v.name}`} disabled={busy} checked={selectedVideos.includes(v.id)} onChange={e => setSelectedVideos(e.target.checked ? [...selectedVideos, v.id] : selectedVideos.filter(id => id !== v.id))}/><span aria-hidden="true"/></label>

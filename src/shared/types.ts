@@ -49,6 +49,7 @@ export interface DesktopAPI {
   onJob(callback: (job: ExportJob) => void): () => void;
   copyText(text: string): Promise<void>;
   reveal(path: string): Promise<void>;
+  openAssetDirectory(): Promise<void>;
   openHelp(): Promise<void>;
   getInfo(): Promise<{ version: string; dataDirectory: string; assetDirectory: string; compatibility: string }>;
   onClose(callback: () => void): () => void;
