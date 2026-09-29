@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import type { MediaAsset } from '../shared/types';
 import { promptTemplates, optimizationExamples } from '../shared/prompt-templates';
+import { BackButton } from './BackButton';
 import { BeforeAfter } from './BeforeAfter';
 
 export interface OptimizationSession { source: MediaAsset | null; result: MediaAsset | null; templateId: string; prompt: string; step: number }
 export const emptyOptimizationSession: OptimizationSession = { source: null, result: null, templateId: promptTemplates[0].id, prompt: promptTemplates[0].prompt, step: 1 };
-export function OptimizationPage({ session, setSession, busy, selectImage, importImage, copyImage, copyPrompt, importResult, useResult, canUseResult }: {
-  session: OptimizationSession; setSession: (value: OptimizationSession) => void; busy: boolean;
+export function OptimizationPage({ back, session, setSession, busy, selectImage, importImage, copyImage, copyPrompt, importResult, useResult, canUseResult }: {
+  back: () => void; session: OptimizationSession; setSession: (value: OptimizationSession) => void; busy: boolean;
   selectImage: () => void; importImage: () => void; copyImage: (id: string) => void; copyPrompt: (prompt: string) => void;
   importResult: () => void; useResult: () => void; canUseResult: boolean;
 }) {
@@ -19,7 +20,7 @@ export function OptimizationPage({ session, setSession, busy, selectImage, impor
     setSession({ ...session, templateId: id, prompt: next.prompt, result: null, step: session.source ? 3 : 1 }); setTab('work');
   };
   return <section ref={root} className="page-content optimization-page" aria-label="AI 图片优化">
-    <h1>AI 图片优化</h1>
+    <header className="page-heading"><BackButton disabled={busy} onClick={back}/><h1>AI 图片优化</h1></header>
     <p>复制图片和提示词，在你使用的 AI 工具中编辑，再将结果导入这里。全程手动操作，无需在片语配置账号或密钥。</p>
     <div className="controls optimization-tabs" aria-label="图片优化视图">
       <button aria-pressed={tab === 'work'} onClick={() => setTab('work')}>优化图片</button>

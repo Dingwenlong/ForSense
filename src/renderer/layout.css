@@ -323,3 +323,6 @@ img, video { max-width: 100%; }
 .window-controls button:active { background: #d8d8d8; }
 .window-controls .window-close:hover, .window-controls .window-close:active { background: #c42b1c; color: #fff; }
 .window-controls button:focus-visible { outline-offset: -3px; }
+
+.page-heading { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; }
+.page-heading h1 { margin: 0; }

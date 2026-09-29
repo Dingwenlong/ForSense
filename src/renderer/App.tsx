@@ -144,7 +144,6 @@ export function App() {
     onOptimize={mode === 'manage' ? openOptimization : undefined} onVideo={openLibraryVideo} perform={action => void perform(action)}/>;
   return <div className="app-shell">
     <WindowTitleBar onError={text => setNotice({ text, error: true })}>
-      {page !== 'library' && <BackButton disabled={working || loading} onClick={goBack}/>}
       <strong>片语</strong>
       <div className="window-drag-region" aria-hidden="true"/>
       {page !== 'assets' && <nav className="controls" aria-label="工作区导航">
@@ -153,8 +152,8 @@ export function App() {
     </WindowTitleBar>
     <main ref={pageBody} className="page-body">
       {loading ? <p role="status">正在加载草稿…</p> : page === 'assets' ? <section className="page-content" aria-label="素材库">
-        <h1>素材库</h1><p className="destination-path library-storage-path" role={directoryError ? 'alert' : undefined}>图片保存位置：{assetDirectory ? <button className="library-directory-link" disabled={working} aria-label="打开素材所在文件夹" onClick={() => void perform(() => window.desktop.openAssetDirectory())}>{assetDirectory}</button> : directoryError ? `读取失败，${directoryError}` : '正在读取…'}</p>{renderAssets('manage')}
-      </section> : page === 'optimization' ? <OptimizationPage session={optimization} setSession={setOptimization} busy={working}
+        <header className="page-heading"><BackButton disabled={working} onClick={goBack}/><h1>素材库</h1></header><p className="destination-path library-storage-path" role={directoryError ? 'alert' : undefined}>图片保存位置：{assetDirectory ? <button className="library-directory-link" disabled={working} aria-label="打开素材所在文件夹" onClick={() => void perform(() => window.desktop.openAssetDirectory())}>{assetDirectory}</button> : directoryError ? `读取失败，${directoryError}` : '正在读取…'}</p>{renderAssets('manage')}
+      </section> : page === 'optimization' ? <OptimizationPage back={goBack} session={optimization} setSession={setOptimization} busy={working}
         selectImage={() => setAssetPicker('ai')} importImage={importOptimizationSource} copyImage={copyImage} copyPrompt={copyPrompt}
         canUseResult={!!draft && !!optimization.result && !draft.items.some(i => i.id === optimization.result!.id)}
         useResult={() => { if (optimization.result) selectLibraryItems([optimization.result]); }}
@@ -165,7 +164,7 @@ export function App() {
           setOptimization(previous => ({ ...previous, result })); setNotice({ text: '优化结果已保存到素材库，原图保留' });
         })}/> : page === 'library' || !draft ?
         <LibraryPage drafts={drafts} filter={filter} query={query} busy={working} setFilter={setFilter} setQuery={setQuery} open={select} remove={setDeleteTarget} create={newDraft}/> :
-        <WorkbenchPage key={draft.id} draft={draft} busy={working} canSaveAs={drafts.length < MAX_DRAFTS} change={change} importFiles={importFiles} addImages={() => setAssetPicker('draft')}
+        <WorkbenchPage back={goBack} key={draft.id} draft={draft} busy={working} canSaveAs={drafts.length < MAX_DRAFTS} change={change} importFiles={importFiles} addImages={() => setAssetPicker('draft')}
           previewSettings={previewSettings} setPreviewSettings={next => setPreviewSettings(normalizePreviewSettings(next))}
           reorder={reorder} edit={setCropAsset} remove={id => { const current = draftRef.current; if (current) change({ items: current.items.filter(item => item.id !== id) }); }}
           rejectVideoDrop={() => setNotice({ text: '请先将视频导入素材库，再从素材详情中取材', error: true })}
