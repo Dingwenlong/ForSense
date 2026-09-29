@@ -35,7 +35,7 @@ export interface DesktopAPI {
   getVideo(id: string): Promise<VideoSource>;
   copyImage(id: string): Promise<void>;
   listDrafts(): Promise<{ drafts: Draft[]; warnings: string[] }>;
-  createDraft(platform: Platform): Promise<Draft>;
+  createDraft(platform: Platform, assetIds?: string[]): Promise<Draft>;
   saveDraft(draft: Draft): Promise<Draft>;
   saveDraftAs(id: string): Promise<Draft>;
   deleteDraft(id: string): Promise<void>;

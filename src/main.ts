@@ -83,7 +83,7 @@ if (ownsLock && !started) app.whenReady().then(async () => {
       });
   });
   register('drafts:list', () => store.list());
-  register('drafts:create', platform => store.create(platform));
+  register('drafts:create', (platform, assetIds) => store.create(platform, assetIds));
   register('drafts:save', draft => store.save(draft));
   register('drafts:save-as', id => store.duplicate(uuid.parse(id)));
   register('drafts:delete', id => store.remove(uuid.parse(id)));

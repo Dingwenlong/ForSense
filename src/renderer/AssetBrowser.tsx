@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import type { LibrarySnapshot, MediaAsset, LibraryItemRef } from '../shared/types';
 import { errorText } from './hooks';
 
-export function AssetBrowser({ busy, refreshKey, mode = 'manage', excludeIds = [], onImport, onUse, onOptimize, onVideo, onDelete, perform }: {
+export function AssetBrowser({ busy, refreshKey, mode = 'manage', excludeIds = [], onImport, onUse, onOptimize, onVideo, onDelete, canCreateDraft = true, perform }: {
   busy: boolean; refreshKey: number; mode?: 'manage' | 'pick' | 'ai'; excludeIds?: string[];
   onImport: () => void; onUse?: (items: MediaAsset[]) => void; onOptimize?: (asset: MediaAsset) => void;
+  canCreateDraft?: boolean;
   onDelete?: (items: LibraryItemRef[]) => void;
   onVideo: (id: string) => void; perform: (action: () => Promise<void>) => void;
 }) {
@@ -23,7 +24,7 @@ export function AssetBrowser({ busy, refreshKey, mode = 'manage', excludeIds = [
   const visible = data.assets.filter(a => (mode !== 'ai' || a.kind === 'image') &&
     (filter === 'all' || filter === 'favorites' && a.favorite || filter === 'ai' && a.optimization || filter === a.kind) &&
     `${a.name} ${a.optimization?.prompt || ''}`.toLowerCase().includes(query.toLowerCase()));
-  const eligible = selected.map(id => data.assets.find(a => a.id === id)).filter((a): a is LibrarySnapshot['assets'][number] => !!a && !excludeIds.includes(a.id));
+  const eligible = selected.map(id => data.assets.find(a => a.id === id)).filter((a): a is LibrarySnapshot['assets'][number] => !!a && (mode !== 'pick' || !excludeIds.includes(a.id)));
   const update = (id: string, patch: Parameters<typeof window.desktop.updateAsset>[1], done?: () => void) => perform(async () => {
     const changed = await window.desktop.updateAsset(id, patch);
     setData(previous => ({ ...previous, assets: previous.assets.map(a => a.id === id ? { ...a, ...changed } : a) }));
@@ -48,7 +49,7 @@ export function AssetBrowser({ busy, refreshKey, mode = 'manage', excludeIds = [
       {data.videos.filter(v => v.name.toLowerCase().includes(query.toLowerCase())).map(v => <article key={v.id} className="material-card">
         <video src={v.videoUrl} controls preload="metadata"/>
         <strong>{v.name}</strong><span>{v.width} × {v.height} · {v.duration.toFixed(1)} 秒</span>
-        <label><input type="checkbox" aria-label={`选择 ${v.name}`} disabled={busy} checked={selectedVideos.includes(v.id)} onChange={e => setSelectedVideos(e.target.checked ? [...selectedVideos, v.id] : selectedVideos.filter(id => id !== v.id))}/>选择</label>
+        <label className="material-selection-bar"><input type="checkbox" aria-label={`选择 ${v.name}`} disabled={busy} checked={selectedVideos.includes(v.id)} onChange={e => setSelectedVideos(e.target.checked ? [...selectedVideos, v.id] : selectedVideos.filter(id => id !== v.id))}/><span aria-hidden="true"/></label>
         <button disabled={busy} onClick={() => onVideo(v.id)}>打开视频取材</button>
       </article>)}
       {!data.videos.length && <p>还没有视频。导入后可以多次截图或制作实况。</p>}
@@ -58,17 +59,16 @@ export function AssetBrowser({ busy, refreshKey, mode = 'manage', excludeIds = [
         {visible.map(asset => <article key={asset.id} className={`material-card ${detailId === asset.id ? 'material-card-active' : ''}`}>
           <button className="material-thumbnail" disabled={busy} aria-expanded={detailId === asset.id} aria-label={`查看素材 ${asset.name}`} onClick={() => inspect(asset.id)}><img loading="lazy" src={asset.imageUrl} alt={asset.name}/></button>
           <strong title={asset.name}>{asset.name}</strong>
-          <span>{asset.kind === 'live' ? '实况' : asset.optimization ? '优化结果' : '图片'} · {asset.width} × {asset.height}</span>
+          <div className="material-metadata"><span>{asset.kind === 'live' ? '实况' : asset.optimization ? '优化结果' : '图片'} · {asset.width} × {asset.height}</span>
+            {mode !== 'pick' && <button className="favorite-button" disabled={busy} aria-label={asset.favorite ? '取消收藏' : '收藏'} title={asset.favorite ? '取消收藏' : '收藏'} aria-pressed={!!asset.favorite} onClick={() => update(asset.id, { favorite: !asset.favorite })}><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill={asset.favorite ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.6"><path d="m12 3 2.78 5.63 6.22.91-4.5 4.39 1.06 6.2L12 17.2l-5.56 2.93 1.06-6.2L3 9.54l6.22-.91Z"/></svg></button>}
+          </div>
           <div className="controls">
-            {mode === 'pick' ? <label className="material-selection-bar">
-              <input type="checkbox" aria-label={`选择 ${asset.name}`} aria-description={excludeIds.includes(asset.id) ? '已在草稿' : undefined}
-                disabled={busy || excludeIds.includes(asset.id)} checked={excludeIds.includes(asset.id) || selected.includes(asset.id)}
+            {mode !== 'ai' ? <label className="material-selection-bar">
+              <input type="checkbox" aria-label={`选择 ${asset.name}`} aria-description={mode === 'pick' && excludeIds.includes(asset.id) ? '已在草稿' : undefined}
+                disabled={busy || (mode === 'pick' && excludeIds.includes(asset.id))} checked={(mode === 'pick' && excludeIds.includes(asset.id)) || selected.includes(asset.id)}
                 onChange={e => setSelected(e.target.checked ? [...selected, asset.id] : selected.filter(id => id !== asset.id))}/>
               <span aria-hidden="true"/>
-            </label> : mode === 'ai' ? <button disabled={busy} onClick={() => onUse?.([asset])}>选择此图</button> : <label>
-              <input type="checkbox" aria-label={`选择 ${asset.name}`} disabled={busy} checked={selected.includes(asset.id)} onChange={e => setSelected(e.target.checked ? [...selected, asset.id] : selected.filter(id => id !== asset.id))}/>选择
-            </label>}
-            {mode !== 'pick' && <button className="favorite-button" disabled={busy} aria-label={asset.favorite ? '取消收藏' : '收藏'} title={asset.favorite ? '取消收藏' : '收藏'} aria-pressed={!!asset.favorite} onClick={() => update(asset.id, { favorite: !asset.favorite })}><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill={asset.favorite ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.6"><path d="m12 3 2.78 5.63 6.22.91-4.5 4.39 1.06 6.2L12 17.2l-5.56 2.93 1.06-6.2L3 9.54l6.22-.91Z"/></svg></button>}
+            </label> : <button disabled={busy} onClick={() => onUse?.([asset])}>选择此图</button>}
           </div>
         </article>)}
       </div>
@@ -88,7 +88,7 @@ export function AssetBrowser({ busy, refreshKey, mode = 'manage', excludeIds = [
       {detail.optimization && <p>此图由你手动导入为优化结果，已保存对应原图与提示词，可在素材库的素材详情中进入 AI 图片优化查看对比。</p>}
     </section>}
     {mode !== 'ai' && (mode === 'manage' || onUse) && <footer className="asset-picker-footer controls">
-      <span>已选 {selected.length + selectedVideos.length} 项</span>{onUse && <button disabled={busy || !eligible.length} onClick={() => { onUse(eligible); setSelected([]); }}>加入当前草稿</button>}
+      <span>已选 {selected.length + selectedVideos.length} 项</span>{onUse && <button disabled={busy || !eligible.length || (mode === 'manage' && !canCreateDraft)} title={mode === 'manage' && !canCreateDraft ? '草稿已达 10 份上限，请先在列表删除不需要的草稿' : undefined} onClick={() => { onUse(eligible); if (mode !== 'manage') setSelected([]); }}>{mode === 'manage' ? '加入到新草稿' : '加入当前草稿'}</button>}
       {mode === 'manage' && onDelete && <button disabled={busy || !selected.length && !selectedVideos.length} onClick={() => onDelete([...selected.map(id => ({ kind: 'asset' as const, id })), ...selectedVideos.map(id => ({ kind: 'video' as const, id }))])}>批量删除</button>}
       <button disabled={busy || !selected.length && !selectedVideos.length} onClick={() => { setSelected([]); setSelectedVideos([]); }}>清空选择</button>
     </footer>}

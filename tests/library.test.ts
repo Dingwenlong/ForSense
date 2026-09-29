@@ -102,3 +102,26 @@ test('global library preserves shared drafts, migrates old records and retains m
   assert.deepEqual(await fs.readdir(path.join(store.root, 'assets')), beforeFailure);
   assert.deepEqual(await fs.readFile(await store.assetPath(original.id, 'image')), originalBytes);
 });
+
+test('creating a draft from library saves ordered assets atomically and preserves the previous draft', async () => {
+  const store = new Store(await makeTestDirectory('library-new-draft-')); await store.init();
+  const assets: MediaAsset[] = [];
+  for (let n = 0; n < 2; n++) {
+    const id = randomUUID(); await fs.mkdir(store.directory('assets', id));
+    assets.push(await store.writeAsset({ id, originalId: id, kind: 'image', name: `image-${n}`, width: 10, height: 10, imageFile: 'image.png', edits: { rotation: 0 } }));
+  }
+  const original = await store.create('douyin', [assets[0].id]);
+  await store.save({ ...original, caption: '原草稿保留' });
+  const snapshot = await store.load(original.id);
+  const next = await store.create('moments', [assets[1].id, assets[0].id]);
+  assert.deepEqual((await store.load(next.id)).items.map(a => a.id), [assets[1].id, assets[0].id]);
+  assert.equal(next.caption, ''); assert.notEqual(next.id, original.id);
+  assert.deepEqual(await store.load(original.id), snapshot);
+  await assert.rejects(store.create('moments', [randomUUID()]));
+  await assert.rejects(store.create('moments', [assets[0].id, assets[0].id]));
+  await assert.rejects(store.create('moments', Array(201).fill(assets[0].id)));
+  assert.equal((await store.list()).drafts.length, 2);
+  for (let n = 2; n < 10; n++) await store.create('moments');
+  await assert.rejects(store.create('moments', [assets[1].id]), /最多保留 10/);
+  assert.equal((await store.list()).drafts.length, 10);
+});

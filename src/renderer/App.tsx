@@ -122,13 +122,22 @@ export function App() {
     await flush(); setVideoSource(id ? await window.desktop.getVideo(id) : null); setVideoOpen(true); setAssetPicker(null);
   });
   const selectLibraryItems = (items: MediaAsset[]) => void perform(async () => { addItems(items); setAssetPicker(null); openPage('workbench'); setNotice({ text: '素材已加入当前草稿' }); });
+  const createFromLibrary = (items: MediaAsset[]) => void perform(async () => {
+    if (!items.length) return;
+    if (items.length > 200) throw new Error('每份草稿最多整理 200 个素材，请减少选择');
+    await flush();
+    const next = await window.desktop.createDraft('moments', items.map(item => item.id));
+    updateList(next); show(next); setQuery(''); setFilter('all'); openPage('workbench');
+    setNotice({ text: `已创建新草稿，加入 ${items.length} 个素材` });
+  });
   const renderAssets = (mode: 'manage' | 'pick' | 'ai') => <AssetBrowser busy={working} refreshKey={libraryRevision} mode={mode}
-    excludeIds={mode === 'ai' ? [] : draft?.items.map(item => item.id)}
+    excludeIds={mode === 'pick' ? draft?.items.map(item => item.id) : []}
+    canCreateDraft={drafts.length < MAX_DRAFTS}
     onImport={mode === 'ai' ? importOptimizationSource : mode === 'pick' ? () => void perform(async () => {
       const paths = await window.desktop.pickImages(); if (!paths.length) return;
       const items = await run<MediaAsset[]>('images', paths); addItems(items); setAssetPicker(null);
     }) : importToLibrary}
-    onUse={mode === 'ai' ? items => { setOptimization(previous => ({ ...previous, source: items[0], result: null, step: 2 })); setAssetPicker(null); } : draft ? selectLibraryItems : undefined}
+    onUse={mode === 'ai' ? items => { setOptimization(previous => ({ ...previous, source: items[0], result: null, step: 2 })); setAssetPicker(null); } : mode === 'manage' ? createFromLibrary : draft ? selectLibraryItems : undefined}
     onDelete={mode === 'manage' ? setDeleteItems : undefined}
     onOptimize={mode === 'manage' ? openOptimization : undefined} onVideo={openLibraryVideo} perform={action => void perform(action)}/>;
   return <div className="app-shell">

@@ -105,9 +105,11 @@ export class Store {
     drafts.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     return { drafts, warnings };
   }
-  async create(platform: Platform): Promise<Draft> {
+  async create(platform: Platform, assetIds: unknown = []): Promise<Draft> {
+    const ids = z.array(uuid).max(200).refine(values => new Set(values).size === values.length, '草稿中有重复素材').parse(assetIds);
+    const items = await Promise.all(ids.map(async id => this.publicAsset(await this.asset(id))));
     const now = new Date().toISOString();
-    const draft: Draft = { version: 1, id: randomUUID(), platform: z.enum(['moments', 'douyin']).parse(platform), caption: '', items: [], createdAt: now, updatedAt: now };
+    const draft: Draft = { version: 1, id: randomUUID(), platform: z.enum(['moments', 'douyin']).parse(platform), caption: '', items, createdAt: now, updatedAt: now };
     return this.addDraft(draft);
   }
   private async addDraft(draft: Draft): Promise<Draft> {
