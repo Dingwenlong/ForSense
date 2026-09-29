@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { MediaAsset, VideoSource, JobKind } from '../shared/types';
 import { Modal } from './Modal';
 import { timeLabel } from './hooks';
-export function VideoTool({ source, setSource, busy, run, perform, add, close }: {
-  source: VideoSource | null; setSource: (s: VideoSource) => void; busy: boolean;
+export function VideoTool({ source, busy, run, perform, add, close }: {
+  source: VideoSource; busy: boolean;
   run: <T>(kind: JobKind, payload: unknown) => Promise<T>; perform: (action: () => Promise<void>) => void;
   add: (asset: MediaAsset) => void; close: () => void;
 }) {
@@ -22,17 +22,16 @@ export function VideoTool({ source, setSource, busy, run, perform, add, close }:
     s = Math.max(0, Math.min(s, source.duration - 0.04)); e = Math.min(source.duration, Math.max(s + 0.04, Math.min(e, s + 3)));
     setStart(s); setEnd(e); setCover(Math.min(e - 0.034, Math.max(s, cover)));
   }
-  const pick = () => perform(async () => { const file = await window.desktop.pickVideo(); if (file) setSource(await run<VideoSource>('video', file)); });
   const take = () => perform(async () => { if (!source) return; const item = await run<MediaAsset>('frame', { sourceId: source.id, time }); add(item); setAdded(n => n + 1); });
   const makeLive = () => perform(async () => { if (!source) return; const item = await run<MediaAsset>('live', { sourceId: source.id, start, end, cover, mute }); add(item); setAdded(n => n + 1); });
   return <Modal title="视频取材" onClose={close} busy={busy} wide>
     <div className="video-workspace"><section className="video-view">
-      <div className="video-source-label"><span>{source?.name || '视频素材'}</span><button onClick={pick} disabled={busy}>{source ? '更换视频' : '选择视频'}</button></div>
-      <div className="video-screen">{source ? <video ref={video} src={source.videoUrl} controls muted={mute} onTimeUpdate={e => {
+      <div className="video-source-label"><span className="video-source-path">视频地址：{source.sourcePath}</span></div>
+      <div className="video-screen"><video ref={video} src={source.videoUrl} controls muted={mute} onTimeUpdate={e => {
         const v = e.currentTarget;
         if (playingClip.current && v.currentTime >= end) { v.pause(); v.currentTime = start; playingClip.current = false; }
         setTime(v.currentTime);
-      }}/> : <p>请选择 MP4 / MOV 视频（H.264 / H.265）</p>}</div>
+      }}/></div>
       <div className="timeline"><input aria-label="视频时间轴" type="range" min="0" max={lastFrame || 1} step="0.001" value={Math.min(time, lastFrame)} disabled={!source || busy} onChange={e => seek(Number(e.target.value))}/><div className="timeline-labels"><span>{timeLabel(time)}</span><span>{timeLabel(source?.duration || 0)}</span></div></div>
       <div className="controls"><button disabled={!source || busy} onClick={() => step(-1)}>上一帧</button><span>精确选择画面</span><button disabled={!source || busy} onClick={() => step(1)}>下一帧</button></div>
     </section><aside className="video-options"><div className="controls"><button aria-pressed={mode === 'frame'} onClick={() => setMode('frame')}>截取图片</button><button aria-pressed={mode === 'live'} onClick={() => setMode('live')}>制作实况</button></div>

@@ -120,7 +120,7 @@ export function App() {
     setOptimization(previous => ({ ...previous, source, result: null, step: 2 })); setAssetPicker(null);
   });
   const openLibraryVideo = (id: string) => void perform(async () => {
-    await flush(); setVideoSource(id ? await window.desktop.getVideo(id) : null); setVideoOpen(true); setAssetPicker(null);
+    await flush(); setVideoSource(await window.desktop.getVideo(id)); setVideoOpen(true); setAssetPicker(null);
   });
   const selectLibraryItems = (items: MediaAsset[]) => void perform(async () => { addItems(items); setAssetPicker(null); openPage('workbench'); setNotice({ text: '素材已加入当前草稿' }); });
   const createFromLibrary = (items: MediaAsset[]) => void perform(async () => {
@@ -166,7 +166,7 @@ export function App() {
         <WorkbenchPage key={draft.id} draft={draft} busy={working} canSaveAs={drafts.length < MAX_DRAFTS} change={change} importFiles={importFiles} addImages={() => setAssetPicker('draft')}
           previewSettings={previewSettings} setPreviewSettings={next => setPreviewSettings(normalizePreviewSettings(next))}
           reorder={reorder} edit={setCropAsset} remove={id => { const current = draftRef.current; if (current) change({ items: current.items.filter(item => item.id !== id) }); }}
-          rejectVideoDrop={() => setNotice({ text: '请到素材库使用“从视频取材”', error: true })}
+          rejectVideoDrop={() => setNotice({ text: '请先将视频导入素材库，再从素材详情中取材', error: true })}
           saveAs={() => void perform(async () => {
             await flush(); const current = draftRef.current; if (!current) return;
             const next = await window.desktop.saveDraftAs(current.id);
@@ -191,7 +191,7 @@ export function App() {
       const current = draftRef.current; if (current) change({ items: current.items.map(i => i.id === cropAsset.id ? item : i) });
       setCropAsset(null);
     })}/>}
-    {videoOpen && <VideoTool source={videoSource} setSource={setVideoSource} busy={working} run={run}
+    {videoOpen && videoSource && <VideoTool source={videoSource} busy={working} run={run}
       perform={action => void perform(action)} add={() => setNotice({ text: '素材已保存到素材库' })} close={() => setVideoOpen(false)}/>}
     {exportOpen && <Modal title={exportResult ? '导出完成' : '导出发布素材包'} onClose={() => setExportOpen(false)} busy={working}>
       {exportResult ? <div className="export-success">

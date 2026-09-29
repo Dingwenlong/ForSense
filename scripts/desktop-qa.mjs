@@ -302,10 +302,12 @@ try {
   record('Caption supplies the draft name; save-as preserves text without naming; search and deletion keep the original intact');
 
   await page.getByRole('navigation', { name: '工作区导航' }).getByRole('button', { name: '素材库', exact: true }).click();
-  await page.getByRole('button', { name: '从视频取材', exact: true }).click();
+  assert.equal(await page.getByRole('button', { name: '从视频取材', exact: true }).count(), 0);
   await selectFiles([inputVideo]);
-  await page.locator('.video-source-label').getByRole('button', { name: '选择视频', exact: true }).click();
-  await waitFor(async () => await page.locator('.video-source-label').innerText().then(t => t.includes('短视频.mp4')));
+  await page.getByRole('button', { name: '导入素材副本', exact: true }).click();
+  await page.getByRole('button', { name: '查看素材 短视频.mp4', exact: true }).click();
+  await page.getByRole('region', { name: '素材详情', exact: true }).getByRole('button', { name: '取材', exact: true }).click();
+  await page.locator('.video-source-label').filter({ hasText: 'video.mp4' }).waitFor();
   await page.getByRole('button', { name: '下一帧', exact: true }).click();
   await page.getByRole('button', { name: '截取并保存到素材库', exact: true }).click();
   await page.getByText('素材已保存到素材库', { exact: true }).waitFor();
@@ -403,8 +405,9 @@ try {
   await page.getByRole('heading', { name: '素材库', exact: true }).waitFor();
   await waitFor(async () => await page.locator('.material-card').count() >= 7);
   await page.getByRole('combobox', { name: '素材分类', exact: true }).selectOption('video');
-  await page.getByRole('button', { name: '取材', exact: true }).click();
-  await page.locator('.video-source-label').filter({ hasText: '短视频.mp4' }).waitFor();
+  await page.getByRole('button', { name: '查看素材 短视频.mp4', exact: true }).click();
+  await page.getByRole('region', { name: '素材详情', exact: true }).getByRole('button', { name: '取材', exact: true }).click();
+  await page.locator('.video-source-label').filter({ hasText: 'video.mp4' }).waitFor();
   await page.getByRole('button', { name: '截取并保存到素材库', exact: true }).click();
   await page.getByText('素材已保存到素材库', { exact: true }).waitFor();
   await page.getByRole('dialog', { name: '视频取材', exact: true }).getByRole('button', { name: '返回上一层', exact: true }).click();

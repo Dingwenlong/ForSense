@@ -36,13 +36,13 @@ export function PreviewSizeControls({ settings, bounds, onChange, disabled }: { 
   }
   return <div ref={root} className="preview-size-controls" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false); }}>
     <div className="preview-size-fields">
-      {(['width', 'height'] as const).map((axis, index) => <span className="preview-dimension" key={axis}>
-        {index === 1 && <span aria-hidden="true">×</span>}
+      {(['width', 'height'] as const).map((axis, index) => <label className="preview-dimension" key={axis}>
+        <span>{index ? '高' : '宽'}</span>
         <input aria-label={`预览${index ? '高度' : '宽度'}`} title={`预览${index ? '高度' : '宽度'}（最大 ${bounds[axis]} px）`}
           type="number" inputMode="numeric" disabled={disabled} min={Math.min(PREVIEW_LIMITS[axis].min, bounds[axis])} max={bounds[axis]} step="1" value={fields[axis]}
           onChange={event => update(axis, event.target.value, false)} onBlur={event => update(axis, event.target.value, true)}
           onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); update(axis, event.currentTarget.value, true); } }}/>
-      </span>)}
+      </label>)}
       <span aria-hidden="true">·</span>
     </div>
     <button ref={trigger} className="preview-size-trigger" type="button" disabled={disabled} aria-label="预览尺寸与机型" aria-haspopup="listbox" aria-expanded={open} aria-controls={`${panelId}-options`}

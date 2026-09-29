@@ -15,7 +15,6 @@ const api: DesktopAPI = {
   deleteDraft: id => ipcRenderer.invoke('drafts:delete', id),
   pickMaterials: () => ipcRenderer.invoke('dialog:materials'),
   pickImages: () => ipcRenderer.invoke('dialog:images'),
-  pickVideo: () => ipcRenderer.invoke('dialog:video'),
   pickDirectory: () => ipcRenderer.invoke('dialog:directory'),
   pathsForFiles: files => files.map(file => webUtils.getPathForFile(file)),
   startJob: (id, kind, payload) => ipcRenderer.invoke('jobs:start', id, kind, payload),

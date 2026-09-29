@@ -90,7 +90,6 @@ if (ownsLock && !started) app.whenReady().then(async () => {
   register('drafts:delete', id => store.remove(uuid.parse(id)));
   register('dialog:materials', async () => (await dialog.showOpenDialog(window!, { title: '导入素材副本', properties: ['openFile', 'multiSelections'], filters: [{ name: '图片与视频', extensions: ['jpg', 'jpeg', 'png', 'webp', 'mp4', 'mov'] }, { name: '图片', extensions: ['jpg', 'jpeg', 'png', 'webp'] }, { name: '视频', extensions: ['mp4', 'mov'] }] })).filePaths);
   register('dialog:images', async () => (await dialog.showOpenDialog(window!, { title: '选择图片', properties: ['openFile', 'multiSelections'], filters: [{ name: '图片', extensions: ['jpg', 'jpeg', 'png', 'webp'] }] })).filePaths);
-  register('dialog:video', async () => (await dialog.showOpenDialog(window!, { title: '选择视频', properties: ['openFile'], filters: [{ name: '视频', extensions: ['mp4', 'mov'] }] })).filePaths[0] || null);
   register('dialog:directory', async () => {
     const result = await dialog.showOpenDialog(window!, { title: '选择导出位置', properties: ['openDirectory', 'createDirectory'] });
     const directory = result.filePaths[0]; if (directory) approvedDirectories.add(path.resolve(directory)); return directory || null;

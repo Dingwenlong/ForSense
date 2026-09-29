@@ -19,6 +19,7 @@ test('mixed imports copy originals, preserve video favorites and roll back faile
   const imageBytes = await fs.readFile(image), videoBytes = await fs.readFile(video);
   assert.deepEqual(await service.execute('materials', [image, video], signal, () => {}), { images: 1, videos: 1 });
   const library = await store.library(), asset = library.assets[0], source = library.videos[0];
+  assert.equal(source.sourcePath, await store.sourcePath(source.id));
   assert.equal(library.assets.length, 1); assert.equal(library.videos.length, 1);
   assert.deepEqual(await fs.readFile(path.join(store.directory('assets', asset.id), 'original.png')), imageBytes);
   assert.deepEqual(await fs.readFile(path.join(store.directory('sources', source.id), 'original.mp4')), videoBytes);

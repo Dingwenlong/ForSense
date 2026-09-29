@@ -18,7 +18,7 @@ export interface Draft {
   items: MediaAsset[]; createdAt: string; updatedAt: string;
 }
 export interface VideoSource {
-  id: string; name: string; videoUrl: string; duration: number; width: number; height: number;
+  id: string; name: string; videoUrl: string; sourcePath: string; duration: number; width: number; height: number;
   frames: number[]; hasAudio: boolean; favorite?: boolean; createdAt?: string;
 }
 export interface LiveClip { sourceId: string; start: number; end: number; cover: number; mute: boolean }
@@ -43,7 +43,6 @@ export interface DesktopAPI {
   deleteLibraryItems(items: LibraryItemRef[]): Promise<{ count: number }>;
   pickMaterials(): Promise<string[]>;
   pickImages(): Promise<string[]>;
-  pickVideo(): Promise<string | null>;
   pickDirectory(): Promise<string | null>;
   pathsForFiles(files: File[]): string[];
   startJob(id: string, kind: JobKind, payload: unknown): Promise<void>;

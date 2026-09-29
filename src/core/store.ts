@@ -89,13 +89,12 @@ export class Store {
   async publicSource(id: string): Promise<VideoSource> {
     const { videoFile, ...source } = await this.source(id);
     const createdAt = source.createdAt || (await fs.stat(path.join(this.directory('sources', id), 'source.json'))).birthtime.toISOString();
-    return { ...source, createdAt, videoUrl: `media://source/${id}/video` };
+    return { ...source, createdAt, sourcePath: inside(this.directory('sources', id), videoFile), videoUrl: `media://source/${id}/video` };
   }
   async writeSource(source: SourceRecord): Promise<VideoSource> {
     source = { ...source, createdAt: source.createdAt || new Date().toISOString() };
     await atomicJSON(path.join(this.directory('sources', source.id), 'source.json'), source);
-    const { videoFile, ...result } = source;
-    return { ...result, videoUrl: `media://source/${source.id}/video` };
+    return this.publicSource(source.id);
   }
   async assetPath(id: string, role: string) {
     if (!['image', 'video'].includes(role)) throw new Error('未知媒体类型');
