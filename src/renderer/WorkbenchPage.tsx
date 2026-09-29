@@ -1,5 +1,5 @@
 import type { Draft, MediaAsset } from '../shared/types';
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Preview } from './Preview';
 import { PreviewSizeControls, PreviewViewport } from './PreviewViewport';
 import { PREVIEW_LIMITS, fitPreviewSettings, type PreviewSettings } from '../shared/preview-settings';
@@ -11,7 +11,9 @@ export function WorkbenchPage({ draft, busy, canSaveAs, change, importFiles, add
   rejectVideoDrop: () => void; exportPackage: () => void;
   previewSettings: PreviewSettings; setPreviewSettings: (next: PreviewSettings) => void;
 }) {
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(false), [finished, setFinished] = useState(false);
+  useEffect(() => { setFinished(false); }, [draft.platform]);
+  const showingFinished = draft.platform === 'moments' && finished;
   const workspace = useRef<HTMLDivElement>(null);
   const [bounds, setBounds] = useState({ width: PREVIEW_LIMITS.width.max, height: PREVIEW_LIMITS.height.max });
   useLayoutEffect(() => {
@@ -30,7 +32,7 @@ export function WorkbenchPage({ draft, busy, canSaveAs, change, importFiles, add
   }, []);
   const appliedPreview = fitPreviewSettings(previewSettings, bounds);
   function handleFiles(files: FileList) {
-    if (busy || !files.length) return;
+    if (busy || showingFinished || !files.length) return;
     const paths = window.desktop.pathsForFiles(Array.from(files));
     if (paths.some(p => /\.(mov|mp4)$/i.test(p))) { rejectVideoDrop(); return; }
     importFiles(paths);
@@ -46,7 +48,8 @@ export function WorkbenchPage({ draft, busy, canSaveAs, change, importFiles, add
           onClick={() => change({ platform: draft.platform === 'moments' ? 'douyin' : 'moments' })}><span aria-hidden="true"/></button>
         <span>抖音</span>
       </div>
-      <button disabled={busy} aria-pressed={editing} onClick={() => setEditing(value => !value)}>{editing ? '完成编辑' : '编辑模式'}</button>
+      {!showingFinished && <button disabled={busy} aria-pressed={editing} onClick={() => setEditing(value => !value)}>{editing ? '完成编辑' : '编辑模式'}</button>}
+      {draft.platform === 'moments' && <button disabled={busy} aria-pressed={showingFinished} onClick={() => { setEditing(false); setFinished(value => !value); }}>{showingFinished ? '返回编辑' : '成品预览'}</button>}
       <PreviewSizeControls settings={previewSettings} bounds={bounds} onChange={setPreviewSettings} disabled={busy}/>
       <div className="workbench-actions">
         <button disabled={busy || !canSaveAs} title={canSaveAs ? undefined : '草稿已达 10 份上限，请先在列表删除不需要的草稿'} onClick={saveAs}>另存草稿</button>
@@ -54,7 +57,7 @@ export function WorkbenchPage({ draft, busy, canSaveAs, change, importFiles, add
       </div>
     </div>
     <div className="workbench-preview" aria-label="实时预览">
-      <div ref={workspace} className="workbench-preview-scroll"><PreviewViewport settings={appliedPreview} bounds={bounds} onChange={setPreviewSettings} busy={busy}><Preview draft={draft} busy={busy} editing={editing} onEdit={edit}
+      <div ref={workspace} className="workbench-preview-scroll"><PreviewViewport settings={appliedPreview} bounds={bounds} onChange={setPreviewSettings} busy={busy}><Preview draft={draft} busy={busy} editing={editing} finished={showingFinished} onEdit={edit}
         onRemove={id => { if (editing && !busy) remove(id); }} onReorder={(from, to) => { if (editing && !busy) reorder(from, to); }}
         onAddImages={addImages} onCaptionChange={caption => change({ caption })}/></PreviewViewport></div>
     </div>
