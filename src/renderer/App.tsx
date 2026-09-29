@@ -133,8 +133,8 @@ export function App() {
     onOptimize={mode === 'manage' ? openOptimization : undefined} onVideo={openLibraryVideo} perform={action => void perform(action)}/>;
   return <div className="app-shell">
     <header className="app-header">
+      {page !== 'library' && <BackButton disabled={working || loading} onClick={goBack}/>}
       <strong>片语</strong>
-      {page !== 'library' && page !== 'workbench' && <BackButton disabled={working || loading} onClick={goBack}/>}
       {page !== 'assets' && <nav className="controls" aria-label="工作区导航">
         <button aria-pressed={page === 'optimization'} disabled={working} onClick={() => navigate('assets')}>素材库</button>
       </nav>}
@@ -153,7 +153,7 @@ export function App() {
           setOptimization(previous => ({ ...previous, result })); setNotice({ text: '优化结果已保存到素材库，原图保留' });
         })}/> : page === 'library' || !draft ?
         <LibraryPage drafts={drafts} filter={filter} query={query} busy={working} setFilter={setFilter} setQuery={setQuery} open={select} remove={setDeleteTarget} create={newDraft}/> :
-        <WorkbenchPage key={draft.id} draft={draft} busy={working} canSaveAs={drafts.length < MAX_DRAFTS} change={change} importFiles={importFiles} addImages={() => setAssetPicker('draft')} back={goBack}
+        <WorkbenchPage key={draft.id} draft={draft} busy={working} canSaveAs={drafts.length < MAX_DRAFTS} change={change} importFiles={importFiles} addImages={() => setAssetPicker('draft')}
           previewSettings={previewSettings} setPreviewSettings={next => setPreviewSettings(normalizePreviewSettings(next))}
           reorder={reorder} edit={setCropAsset} remove={id => { const current = draftRef.current; if (current) change({ items: current.items.filter(item => item.id !== id) }); }}
           rejectVideoDrop={() => setNotice({ text: '请到素材库使用“从视频取材”', error: true })}

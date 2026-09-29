@@ -20,7 +20,7 @@ img, video { max-width: 100%; }
 
 /* Library and live preview workbench. */
 .app-shell { display: flex; flex-direction: column; height: 100vh; min-height: 0; }
-.app-header { display: flex; align-items: center; gap: 16px; padding: 10px 18px; border-bottom: 1px solid GrayText; }
+.app-header { display: flex; align-items: center; gap: 10px; padding: 10px 18px; border-bottom: 1px solid GrayText; }
 .app-header > nav { margin-left: auto; }
 .page-body { flex: 1; min-height: 0; overflow: auto; }
 .page-content { width: min(100%, 1160px); margin: 0 auto; padding: 16px 22px 24px; }
@@ -45,7 +45,8 @@ img, video { max-width: 100%; }
 /* A small toolbar surrounds the preview; editing happens in the preview card. */
 .workbench-page { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 .workbench-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 10px 14px; border-bottom: 1px solid GrayText; }
-.back-button { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 3px; flex-shrink: 0; }
+.back-button { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 3px; flex-shrink: 0; border: 1px solid #888; border-radius: 2px; background: ButtonFace; color: ButtonText; }
+.back-button:disabled { color: GrayText; }
 .platform-control { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
 .platform-switch { width: 38px; height: 22px; padding: 2px; border: 1px solid #777; border-radius: 12px; background: #ddd; }
 .platform-switch > span { display: block; width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 1px solid #999; }
@@ -145,9 +146,8 @@ img, video { max-width: 100%; }
 .modal { background: Canvas; color: CanvasText; border: 2px solid GrayText; padding: 16px; width: 650px; max-width: 100%; max-height: calc(100vh - 32px); overflow: auto; }
 .modal-wide { width: 1040px; }
 .modal-header, .modal-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; justify-content: space-between; }
-.modal-header { border-bottom: 1px solid GrayText; margin-bottom: 12px; }
-.modal-header h2 { margin: 0 0 12px; }
-.modal-header > .back-button { margin-bottom: 12px; }
+.modal-header { flex-wrap: nowrap; justify-content: flex-start; gap: 10px; border-bottom: 1px solid GrayText; padding-bottom: 12px; margin-bottom: 12px; }
+.modal-header h2 { margin: 0; }
 .modal-header > h2 { flex: 1; }
 .modal-footer { margin-top: 16px; border-top: 1px solid GrayText; padding-top: 12px; }
 .lightbox { display: flex; align-items: center; justify-content: center; height: 65vh; }
@@ -253,3 +253,5 @@ img, video { max-width: 100%; }
 .favorite-button { display: inline-flex; align-items: center; justify-content: center; }
 .favorite-button[aria-pressed="true"] { outline: none; }
 .favorite-button:focus-visible { outline: 2px solid Highlight; }
+
+.wechat-proof__caption:focus, .douyin-proof__caption-editor:focus { outline: none; box-shadow: none; }

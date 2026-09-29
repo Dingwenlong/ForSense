@@ -1,15 +1,14 @@
 import type { Draft, MediaAsset } from '../shared/types';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { Preview } from './Preview';
-import { BackButton } from './BackButton';
 import { PreviewSizeControls, PreviewViewport } from './PreviewViewport';
 import { PREVIEW_LIMITS, fitPreviewSettings, type PreviewSettings } from '../shared/preview-settings';
 
-export function WorkbenchPage({ draft, busy, canSaveAs, change, importFiles, addImages, reorder, edit, remove, saveAs, rejectVideoDrop, exportPackage, back, previewSettings, setPreviewSettings }: {
+export function WorkbenchPage({ draft, busy, canSaveAs, change, importFiles, addImages, reorder, edit, remove, saveAs, rejectVideoDrop, exportPackage, previewSettings, setPreviewSettings }: {
   draft: Draft; busy: boolean; canSaveAs: boolean; change: (patch: Partial<Draft>) => void;
   importFiles: (paths?: string[]) => void; addImages: () => void; reorder: (from: number, to: number) => void;
   edit: (asset: MediaAsset) => void; remove: (id: string) => void; saveAs: () => void;
-  rejectVideoDrop: () => void; exportPackage: () => void; back: () => void;
+  rejectVideoDrop: () => void; exportPackage: () => void;
   previewSettings: PreviewSettings; setPreviewSettings: (next: PreviewSettings) => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -41,7 +40,6 @@ export function WorkbenchPage({ draft, busy, canSaveAs, change, importFiles, add
     onDragOver={event => { if (event.dataTransfer.types.includes('Files')) event.preventDefault(); }}
     onDrop={event => { if (!event.dataTransfer.files.length) return; event.preventDefault(); handleFiles(event.dataTransfer.files); }}>
     <div className="workbench-toolbar">
-      <BackButton disabled={busy} onClick={back}/>
       <div className="platform-control" role="group" aria-label="预览平台">
         <span>微信</span>
         <button type="button" role="switch" aria-label="抖音预览" aria-checked={draft.platform === 'douyin'} disabled={busy} className="platform-switch"

@@ -21,6 +21,7 @@ delete env.ELECTRON_RUN_AS_NODE;
 async function launch() {
   application = await electron.launch({ executablePath: executable, env, timeout: 30000 });
   page = await application.firstWindow(); page.setDefaultTimeout(15000);
+  await application.evaluate(({ BrowserWindow }) => { const window = BrowserWindow.getAllWindows()[0]; window.webContents.setBackgroundThrottling(false); window.hide(); });
   page.on('pageerror', error => errors.push(error.message));
   await page.getByRole('heading', { name: '我的草稿', exact: true }).waitFor();
   clipboardAvailable = await application.evaluate(async ({ clipboard }) => {
@@ -393,7 +394,7 @@ try {
   await page.locator('.video-source-label').filter({ hasText: '短视频.mp4' }).waitFor();
   await page.getByRole('button', { name: '截取并保存到素材库', exact: true }).click();
   await page.getByText('素材已保存到素材库', { exact: true }).waitFor();
-  await page.getByRole('button', { name: '返回素材库', exact: true }).click();
+  await page.getByRole('dialog', { name: '视频取材', exact: true }).getByRole('button', { name: '返回上一层', exact: true }).click();
   await dismissNotice();
   record('Global library includes existing images, Live Photos and reusable imported videos');
 

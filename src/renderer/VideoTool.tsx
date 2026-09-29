@@ -45,6 +45,6 @@ export function VideoTool({ source, setSource, busy, run, perform, add, close }:
           <button disabled={!source || busy || end <= start} onClick={makeLive}>制作并保存到素材库</button>
           <p>导出时选择 iPhone 或标准安卓格式。手机相册兼容性待真机验证。</p>
         </div>}
-    </aside></div><footer className="modal-footer"><span>{added ? `已保存 ${added} 个素材，可继续取材` : '视频在本机处理，原始文件保留'}</span><button disabled={busy} onClick={close}>返回素材库</button></footer>
+    </aside></div><footer className="modal-footer"><span>{added ? `已保存 ${added} 个素材，可继续取材` : '视频在本机处理，原始文件保留'}</span></footer>
   </Modal>;
 }
