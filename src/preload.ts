@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { DesktopAPI, ExportJob } from './shared/types';
 const api: DesktopAPI = {
+  deleteLibraryItems: items => ipcRenderer.invoke('library:delete', items),
   listLibrary: () => ipcRenderer.invoke('library:list'),
   updateAsset: (id, patch) => ipcRenderer.invoke('library:update', id, patch),
   getAsset: id => ipcRenderer.invoke('library:asset', id),

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Draft, MediaAsset, VideoSource } from '../shared/types';
+import type { Draft, MediaAsset, VideoSource, LibraryItemRef } from '../shared/types';
 import { MAX_DRAFTS } from '../shared/types';
 import { draftName } from '../shared/draft-name';
 import { DEFAULT_PREVIEW, PREVIEW_STORAGE_KEY, normalizePreviewSettings } from '../shared/preview-settings';
@@ -24,12 +24,14 @@ export function App() {
   });
   useEffect(() => { try { localStorage.setItem(PREVIEW_STORAGE_KEY, JSON.stringify(previewSettings)); } catch { /* Keep the current preview usable when preference storage is unavailable. */ } }, [previewSettings]);
   const [libraryRevision, setLibraryRevision] = useState(0), [assetPicker, setAssetPicker] = useState<'draft' | 'ai' | null>(null);
+  const [assetDirectory, setAssetDirectory] = useState(''), [directoryError, setDirectoryError] = useState('');
   const [optimization, setOptimization] = useState<OptimizationSession>(emptyOptimizationSession);
   const [busy, setBusy] = useState(false), [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<{ text: string; error?: boolean; retry?: () => void } | null>(null);
   const [cropAsset, setCropAsset] = useState<MediaAsset | null>(null), [videoOpen, setVideoOpen] = useState(false), [videoSource, setVideoSource] = useState<VideoSource | null>(null);
   const [exportOpen, setExportOpen] = useState(false), [exportDirectory, setExportDirectory] = useState(''), [exportFormat, setExportFormat] = useState<'folder' | 'zip'>('folder'), [targets, setTargets] = useState<('apple' | 'android')[]>(['apple', 'android']);
   const [exportResult, setExportResult] = useState<string | null>(null), [deleteTarget, setDeleteTarget] = useState<Draft | null>(null);
+  const [deleteItems, setDeleteItems] = useState<LibraryItemRef[] | null>(null);
   const draftRef = useRef<Draft | null>(null), timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined), revision = useRef(0), dirty = useRef(false), saveQueue = useRef<Promise<unknown>>(Promise.resolve());
   const pageBody = useRef<HTMLElement>(null);
   useEffect(() => { pageBody.current?.scrollTo(0, 0); }, [page]);
@@ -56,6 +58,7 @@ export function App() {
   const flushRef = useRef(flush); flushRef.current = flush;
   useEffect(() => {
     let active = true;
+    void window.desktop.getInfo().then(info => { if (active) setAssetDirectory(info.assetDirectory); }).catch(error => { if (active) setDirectoryError(errorText(error)); });
     window.desktop.listDrafts().then(async result => {
       if (!active) return;
       if (result.warnings.length) setNotice({ text: result.warnings.join('；'), error: true });
@@ -126,18 +129,19 @@ export function App() {
       const items = await run<MediaAsset[]>('images', paths); addItems(items); setAssetPicker(null);
     }) : importToLibrary}
     onUse={mode === 'ai' ? items => { setOptimization(previous => ({ ...previous, source: items[0], result: null, step: 2 })); setAssetPicker(null); } : draft ? selectLibraryItems : undefined}
+    onDelete={mode === 'manage' ? setDeleteItems : undefined}
     onOptimize={mode === 'manage' ? openOptimization : undefined} onVideo={openLibraryVideo} perform={action => void perform(action)}/>;
   return <div className="app-shell">
     <header className="app-header">
       <strong>片语</strong>
       {page !== 'library' && page !== 'workbench' && <BackButton disabled={working || loading} onClick={goBack}/>}
-      <nav className="controls" aria-label="工作区导航">
-        <button aria-pressed={page === 'assets' || page === 'optimization'} disabled={working} onClick={() => navigate('assets')}>素材库</button>
-      </nav>
+      {page !== 'assets' && <nav className="controls" aria-label="工作区导航">
+        <button aria-pressed={page === 'optimization'} disabled={working} onClick={() => navigate('assets')}>素材库</button>
+      </nav>}
     </header>
     <main ref={pageBody} className="page-body">
       {loading ? <p role="status">正在加载草稿…</p> : page === 'assets' ? <section className="page-content" aria-label="素材库">
-        <h1>素材库</h1><p>所有草稿共用一份素材库。原图、截图、实况与手动导入的优化结果都保存在本机。</p>{renderAssets('manage')}
+        <h1>素材库</h1><p className="destination-path library-storage-path" role={directoryError ? 'alert' : undefined}>图片保存位置：{assetDirectory || (directoryError ? `读取失败，${directoryError}` : '正在读取…')}</p>{renderAssets('manage')}
       </section> : page === 'optimization' ? <OptimizationPage session={optimization} setSession={setOptimization} busy={working}
         selectImage={() => setAssetPicker('ai')} importImage={importOptimizationSource} copyImage={copyImage} copyPrompt={copyPrompt}
         canUseResult={!!draft && !!optimization.result && !draft.items.some(i => i.id === optimization.result!.id)}
@@ -207,6 +211,15 @@ export function App() {
           <button disabled={working || !exportDirectory || (!!hasLive && !targets.length)} onClick={doExport}>{working ? '正在导出…' : '开始导出'}</button>
         </footer>
       </>}
+    </Modal>}
+    {deleteItems && <Modal title="删除所选素材？" onClose={() => setDeleteItems(null)} busy={working}>
+      <p>将 {deleteItems.length} 项素材移到系统回收站。仍被草稿或其他素材引用的文件不能删除。</p>
+      <footer className="modal-footer"><button disabled={working} onClick={() => void perform(async () => {
+        await flush();
+        const result = await window.desktop.deleteLibraryItems(deleteItems);
+        setOptimization(emptyOptimizationSession); setVideoSource(null);
+        setDeleteItems(null); setLibraryRevision(n => n + 1); setNotice({ text: `已将 ${result.count} 项素材移到回收站` });
+      })}>移到回收站</button></footer>
     </Modal>}
     {deleteTarget && <Modal title="删除这份草稿？" onClose={() => setDeleteTarget(null)} busy={working}>
       <p>将删除「{draftName(deleteTarget.caption)}」的文案与素材排列，导入的原始文件不会被删除。</p>

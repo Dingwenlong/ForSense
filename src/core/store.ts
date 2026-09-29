@@ -6,6 +6,7 @@ import type { Draft, Edits, MediaAsset, Platform, VideoSource, LibrarySnapshot }
 import { MAX_DRAFTS } from '../shared/types';
 import { draftName } from '../shared/draft-name';
 import { atomicJSON, inside } from './io';
+import { recoverLibraryDeletes } from './library-delete';
 
 export const uuid = z.string().uuid();
 export const editsSchema = z.object({ rotation: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]),
@@ -24,7 +25,7 @@ export class Store {
   private writes = new Map<string, Promise<unknown>>();
   private additions: Promise<unknown> = Promise.resolve();
   constructor(readonly root: string) {}
-  async init() { for (const name of ['drafts', 'assets', 'sources', 'temporary']) await fs.mkdir(inside(this.root, name), { recursive: true }); }
+  async init() { for (const name of ['drafts', 'assets', 'sources', 'temporary']) await fs.mkdir(inside(this.root, name), { recursive: true }); await recoverLibraryDeletes(this.root); }
   directory(type: 'assets' | 'sources', id: string) { return inside(this.root, type, uuid.parse(id)); }
   draftFile(id: string) { return inside(this.root, 'drafts', `${uuid.parse(id)}.json`); }
   async asset(id: string): Promise<AssetRecord> {
@@ -43,7 +44,7 @@ export class Store {
   }
   async updateAsset(id: string, input: unknown) {
     uuid.parse(id);
-    const patch = z.object({ name: z.string().trim().min(1).max(240).optional(), favorite: z.boolean().optional(), archived: z.boolean().optional() }).strict().parse(input);
+    const patch = z.object({ name: z.string().trim().min(1).max(240).optional(), favorite: z.boolean().optional() }).strict().parse(input);
     const key = `asset:${id}`, previous = this.writes.get(key) || Promise.resolve();
     const write = previous.catch(() => {}).then(async () => {
       const record = await this.asset(id);

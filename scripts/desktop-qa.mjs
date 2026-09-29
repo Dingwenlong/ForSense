@@ -32,6 +32,16 @@ async function selectFiles(paths) {
 }
 const photos = () => page.locator('.wechat-proof__photo');
 const dismissNotice = async () => { const button = page.getByRole('button', { name: '关闭提示', exact: true }); if (await button.count()) await button.click(); };
+const sizeMenuButton = () => page.getByRole('button', { name: '预览尺寸与机型', exact: true });
+const openSizeMenu = async () => {
+  if (await sizeMenuButton().getAttribute('aria-expanded') !== 'true') await sizeMenuButton().click();
+  await page.getByRole('listbox', { name: '预览机型', exact: true }).waitFor();
+};
+const chooseSize = async label => {
+  await openSizeMenu(); const name = label.split(' · ').at(-1);
+  for (const option of await page.getByRole('option').all()) if ((await option.innerText()).endsWith(' · ' + name)) { await option.click(); return; }
+  throw new Error('Preview preset not found: ' + name);
+};
 
 try {
   const images = [];
@@ -70,18 +80,28 @@ try {
   const sizeBox = page.locator('.preview-viewport');
   const widthField = page.getByRole('spinbutton', { name: '预览宽度', exact: true });
   const heightField = page.getByRole('spinbutton', { name: '预览高度', exact: true });
-  const deviceSelect = page.getByRole('combobox', { name: '预览机型', exact: true });
+  assert.equal(await sizeMenuButton().innerText(), '默认尺寸');
+  assert.equal(await widthField.count(), 1);
+  await openSizeMenu();
+  assert.match(await page.getByRole('option').first().innerText(), /^520 × \d+ · 默认尺寸$/);
+  await page.keyboard.press('Escape');
+  assert.equal(await sizeMenuButton().getAttribute('aria-expanded'), 'false');
+  await sizeMenuButton().focus(); await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter');
+  assert.equal(await sizeMenuButton().innerText(), 'iPhone SE');
   const longCaption = caption + '\n' + '窄屏排版也要保留完整文案与表情。👨‍👩‍👧‍👦 '.repeat(25);
   await page.getByRole('textbox', { name: '发布文案', exact: true }).fill(longCaption);
   await waitFor(async () => await page.evaluate(async id => (await window.desktop.listDrafts()).drafts.find(d => d.id === id)?.caption, originalDraftId) === longCaption);
   const originalSnapshot = await page.evaluate(async id => (await window.desktop.listDrafts()).drafts.find(d => d.id === id), originalDraftId);
-  await deviceSelect.selectOption('iphone-se');
+  await chooseSize('375 × 667 · iPhone SE');
+  await openSizeMenu();
   await waitFor(async () => await widthField.inputValue() === '375' && await heightField.inputValue() === '667');
   const presetRect = await sizeBox.boundingBox();
   assert.equal(presetRect.width, 375); assert.equal(presetRect.height, 667);
   await widthField.fill('460'); await widthField.press('Enter');
   await heightField.fill('500'); await heightField.press('Enter');
-  assert.equal(await deviceSelect.inputValue(), 'custom');
+  assert.equal(await sizeMenuButton().innerText(), '自定义');
+  assert.equal(await page.getByRole('option', { name: '460 × 500 · 自定义', exact: true }).getAttribute('aria-selected'), 'true');
   await widthField.fill(''); await widthField.press('Tab');
   assert.equal(await widthField.inputValue(), '460');
   await widthField.fill('10'); await widthField.press('Enter');
@@ -97,16 +117,37 @@ try {
   await page.mouse.down();
   await page.mouse.move(resizeStart.x + resizeStart.width + 37, resizeStart.y + resizeStart.height + 57, { steps: 12 });
   await page.mouse.up();
+  await openSizeMenu();
   await waitFor(async () => Number(await widthField.inputValue()) > 420 && Number(await heightField.inputValue()) > 540);
   assert.deepEqual(await page.evaluate(async id => (await window.desktop.listDrafts()).drafts.find(d => d.id === id), originalDraftId), originalSnapshot);
   await page.screenshot({ path: path.join(output, '15-custom-preview-size.png') });
-  await page.getByRole('button', { name: '重置尺寸', exact: true }).click();
+  await chooseSize('520 × 780 · 默认尺寸');
+  assert.equal(await sizeMenuButton().innerText(), '默认尺寸');
   await page.getByRole('textbox', { name: '发布文案', exact: true }).fill(caption);
   await waitFor(async () => await page.evaluate(async id => (await window.desktop.listDrafts()).drafts.find(d => d.id === id)?.caption, originalDraftId) === caption);
-  record('Device preset, custom width/height and resize handle change preview geometry without modifying the draft');
+  const maxWidth = Number(await widthField.getAttribute('max')), maxHeight = Number(await heightField.getAttribute('max'));
+  await widthField.fill('99999'); await widthField.press('Enter');
+  await heightField.fill('99999'); await heightField.press('Enter');
+  assert.equal(Number(await widthField.inputValue()), maxWidth); assert.equal(Number(await heightField.inputValue()), maxHeight);
+  await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1080, 720));
+  await waitFor(async () => await page.evaluate(() => {
+    const outer = document.querySelector('.workbench-preview-scroll').getBoundingClientRect(), inner = document.querySelector('.preview-viewport').getBoundingClientRect();
+    return window.innerWidth <= 1080 && inner.left >= outer.left && inner.right <= outer.right && inner.top >= outer.top && inner.bottom <= outer.bottom;
+  }));
+  const constrained = await page.evaluate(() => {
+    const host = document.querySelector('.workbench-preview-scroll'), box = document.querySelector('.preview-viewport');
+    const outer = host.getBoundingClientRect(), inner = box.getBoundingClientRect();
+    return inner.left >= outer.left && inner.right <= outer.right && inner.top >= outer.top && inner.bottom <= outer.bottom;
+  });
+  assert.equal(constrained, true);
+  await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1440, 930));
+  await chooseSize('默认尺寸');
+  record('Combined header edits dimensions, applies presets and limits both input and resize to the available workspace');
 
   await page.getByRole('navigation', { name: '工作区导航' }).getByRole('button', { name: '素材库', exact: true }).click();
   await page.getByRole('heading', { name: '素材库', exact: true }).waitFor();
+  assert.equal(await page.getByRole('button', { name: '素材库', exact: true }).count(), 0);
+  assert.equal(await page.locator('.library-storage-path').innerText(), '图片保存位置：' + path.join(work, 'profile', 'library', 'assets'));
   await page.getByRole('button', { name: '返回上一层', exact: true }).click();
   await page.getByRole('region', { name: '预览工作台', exact: true }).waitFor();
   assert.equal(await page.getByRole('textbox', { name: '发布文案', exact: true }).inputValue(), caption);
@@ -312,16 +353,17 @@ try {
   record('ZIP export remains available from the preview toolbar');
 
   await page.getByRole('textbox', { name: '发布文案', exact: true }).fill(douyinCaption + '\n刚刚补上的一句。');
-  await deviceSelect.selectOption('pixel-7');
+  await chooseSize('412 × 915 · Pixel 7');
   await application.close(); application = null;
   await launch();
   await originalCard().locator('.library-card-open').click();
   assert.equal(await page.getByRole('textbox', { name: '发布文案', exact: true }).inputValue(), douyinCaption + '\n刚刚补上的一句。');
   assert.equal(await photos().count(), 6);
-  assert.equal(await page.getByRole('combobox', { name: '预览机型', exact: true }).inputValue(), 'pixel-7');
+  assert.equal(await sizeMenuButton().innerText(), 'Pixel 7');
+  await openSizeMenu();
   assert.equal(await page.getByRole('spinbutton', { name: '预览宽度', exact: true }).inputValue(), '412');
-  assert.equal(await page.getByRole('spinbutton', { name: '预览高度', exact: true }).inputValue(), '915');
-  await page.getByRole('button', { name: '重置尺寸', exact: true }).click();
+  assert.equal(Number(await page.getByRole('spinbutton', { name: '预览高度', exact: true }).inputValue()), Math.min(915, Number(await page.getByRole('spinbutton', { name: '预览高度', exact: true }).getAttribute('max'))));
+  await chooseSize('520 × 780 · 默认尺寸');
   record('Preview device and dimensions survive application restart');
   record('Closing while editing inline caption flushes the draft for restart');
 
@@ -360,22 +402,45 @@ try {
   await page.getByRole('button', { name: '从电脑导入图片', exact: true }).click();
   await page.getByRole('searchbox', { name: '搜索素材', exact: true }).fill('product-before');
   await page.getByRole('button', { name: '查看素材 product-before.png', exact: true }).click();
+  assert.equal(await page.getByRole('textbox', { name: '素材名称', exact: true }).count(), 0);
+  await page.getByRole('button', { name: '编辑素材名称', exact: true }).click();
+  await page.getByRole('textbox', { name: '素材名称', exact: true }).fill('取消这次改名');
+  await page.getByRole('button', { name: '取消', exact: true }).click();
+  assert.equal(await page.getByRole('textbox', { name: '素材名称', exact: true }).count(), 0);
+  await page.getByRole('button', { name: '编辑素材名称', exact: true }).click();
   await page.getByRole('textbox', { name: '素材名称', exact: true }).fill('案例原图');
-  await page.getByRole('button', { name: '保存名称', exact: true }).click();
+  await page.getByRole('button', { name: '应用', exact: true }).click();
   await page.getByRole('searchbox', { name: '搜索素材', exact: true }).fill('案例原图');
   await page.locator('.material-card').getByRole('button', { name: '收藏', exact: true }).click();
-  await page.getByRole('button', { name: '归档素材', exact: true }).click();
-  await waitFor(async () => await page.locator('.material-card').count() === 0);
-  await page.getByRole('combobox', { name: '素材分类', exact: true }).selectOption('archived');
-  assert.equal(await page.locator('.material-card').count(), 1);
-  await page.getByRole('button', { name: '恢复到素材库', exact: true }).click();
-  await page.getByRole('button', { name: '恢复到素材库', exact: true }).waitFor({ state: 'hidden' });
+  await waitFor(async () => await page.locator('.favorite-button svg').getAttribute('fill') === 'currentColor');
+  assert.equal(await page.getByRole('option', { name: '已归档', exact: true }).count(), 0);
   await page.getByRole('combobox', { name: '素材分类', exact: true }).selectOption('favorites');
   assert.equal(await page.locator('.material-card').count(), 1);
-  await page.getByRole('button', { name: '收起详情', exact: true }).click();
+  await page.getByRole('button', { name: '查看素材 案例原图', exact: true }).click();
+  assert.equal(await page.getByRole('region', { name: '素材详情', exact: true }).count(), 0);
   await dismissNotice();
   await page.screenshot({ path: path.join(output, '08-global-library.png') });
-  record('Global material import, search, rename, favorite, archive and restore work');
+  record('Global material import, rename apply/cancel, star favorite and repeated-click detail collapse work');
+
+  await page.getByRole('combobox', { name: '素材分类', exact: true }).selectOption('all');
+  await selectFiles([path.join(root, 'public/ai-examples/food-before.png'), path.join(root, 'public/ai-examples/food-after.png')]);
+  await page.getByRole('button', { name: '从电脑导入图片', exact: true }).click();
+  await page.getByRole('searchbox', { name: '搜索素材', exact: true }).fill('food-');
+  await page.getByRole('checkbox', { name: '选择 food-before.png', exact: true }).check();
+  await page.getByRole('checkbox', { name: '选择 food-after.png', exact: true }).check();
+  await page.getByRole('button', { name: '批量删除', exact: true }).click();
+  await page.getByRole('dialog', { name: '删除所选素材？', exact: true }).getByRole('button', { name: '返回上一层', exact: true }).click();
+  assert.equal(await page.locator('.material-card').count(), 2);
+  await application.evaluate(({ shell }, destination) => {
+    shell.trashItem = async directory => { await process.getBuiltinModule('node:fs').promises.rename(directory, destination); };
+  }, path.join(work, 'recycled-batch'));
+  await page.getByRole('button', { name: '批量删除', exact: true }).click();
+  await page.getByRole('button', { name: '移到回收站', exact: true }).click();
+  await page.getByText('已将 2 项素材移到回收站', { exact: true }).waitFor();
+  await waitFor(async () => await page.locator('.material-card').count() === 0);
+  await dismissNotice();
+  record('Batch delete confirmation can return; selected images are removed together (recycle boundary redirected to retained fixtures)');
+  await page.getByRole('searchbox', { name: '搜索素材', exact: true }).fill('案例原图');
 
   await page.getByRole('button', { name: '查看素材 案例原图', exact: true }).click();
   await page.getByRole('region', { name: '素材详情', exact: true }).getByRole('button', { name: 'AI 图片优化', exact: true }).click();
@@ -440,7 +505,6 @@ try {
   await application.close(); application = null;
   await launch();
   await page.getByRole('navigation', { name: '工作区导航' }).getByRole('button', { name: '素材库', exact: true }).click();
-  await page.getByRole('navigation', { name: '工作区导航' }).getByRole('button', { name: '素材库', exact: true }).click();
   await page.getByRole('combobox', { name: '素材分类', exact: true }).selectOption('ai');
   await page.getByRole('button', { name: '查看素材 product-after.png', exact: true }).click();
   await page.getByRole('region', { name: '素材详情', exact: true }).getByRole('button', { name: 'AI 图片优化', exact: true }).click();
@@ -453,7 +517,7 @@ try {
   await page.getByRole('button', { name: '返回上一层', exact: true }).click();
   await page.getByRole('heading', { name: '我的草稿', exact: true }).waitFor();
   assert.equal(await page.getByRole('button', { name: '返回上一层', exact: true }).count(), 0);
-  record('AI returns to its library parent and then home; repeated navigation creates no back loop');
+  record('AI returns to its library parent and then home without a back loop');
   while (await page.locator('.library-card').count() < 10) {
     await page.getByRole('button', { name: '新建草稿', exact: true }).click();
     await page.getByRole('region', { name: '预览工作台', exact: true }).waitFor();

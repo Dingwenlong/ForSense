@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { promises as fs } from 'node:fs';
 import { z } from 'zod';
 import { Store, uuid } from './core/store';
+import { deleteLibraryItems } from './core/library-delete';
 import { MediaService } from './core/service';
 import { messageOf } from './core/io';
 import { writeClipboardVerified } from './core/clipboard';
@@ -20,6 +21,8 @@ protocol.registerSchemesAsPrivileged([{ scheme: 'media', privileges: { standard:
 let window: BrowserWindow | null = null;
 let service: MediaService;
 let readyToClose = false;
+let mutationQueue: Promise<unknown> = Promise.resolve();
+const mutations = new Set(['library:delete', 'library:update', 'drafts:create', 'drafts:save', 'drafts:save-as', 'drafts:delete', 'jobs:start']);
 const ownsLock = app.requestSingleInstanceLock();
 if (!ownsLock) app.quit();
 app.on('second-instance', () => { window?.restore(); window?.focus(); });
@@ -27,7 +30,12 @@ app.on('second-instance', () => { window?.restore(); window?.focus(); });
 function register(name: string, handler: (...args: any[]) => unknown) {
   ipcMain.handle(name, async (event, ...args) => {
     if (!window || event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame) throw new Error('无效的应用请求');
-    try { return await handler(...args); }
+    try {
+      if (!mutations.has(name)) return await handler(...args);
+      const operation = mutationQueue.catch(() => {}).then(() => handler(...args));
+      mutationQueue = operation;
+      return await operation;
+    }
     catch (error) { throw new Error(error instanceof z.ZodError ? '输入参数无效' : messageOf(error)); }
   });
 }
@@ -50,6 +58,10 @@ if (ownsLock && !started) app.whenReady().then(async () => {
     } catch { return new Response('Not found', { status: 404 }); }
   });
   const approvedDirectories = new Set<string>();
+  register('library:delete', items => {
+    if (service.active()) throw new Error('请等待媒体任务完成后再删除素材');
+    return deleteLibraryItems(store, items, directory => shell.trashItem(directory));
+  });
   register('library:list', () => store.library());
   register('library:update', (id, patch) => store.updateAsset(uuid.parse(id), patch));
   register('library:asset', async id => store.publicAsset(await store.asset(uuid.parse(id))));
@@ -95,8 +107,8 @@ if (ownsLock && !started) app.whenReady().then(async () => {
     const help = app.isPackaged ? path.join(process.resourcesPath, '使用说明.md') : path.join(app.getAppPath(), 'docs/使用说明.md');
     const error = await shell.openPath(help); if (error) throw new Error('无法打开使用说明，请在安装目录中查看');
   });
-  register('app:info', () => ({ version: app.getVersion(), dataDirectory: root, compatibility: 'iPhone / Android 真机兼容性待验证' }));
-  register('app:close-ready', async () => { service.cancelAll(); await service.waitForIdle(); readyToClose = true; window?.close(); });
+  register('app:info', () => ({ version: app.getVersion(), dataDirectory: root, assetDirectory: path.join(root, 'assets'), compatibility: 'iPhone / Android 真机兼容性待验证' }));
+  register('app:close-ready', async () => { await mutationQueue.catch(() => {}); service.cancelAll(); await service.waitForIdle(); readyToClose = true; window?.close(); });
   window = new BrowserWindow({ width: 1440, height: 930, minWidth: 1080, minHeight: 720, backgroundColor: '#ffffff', title: '片语 · 图文工作台', icon: app.isPackaged ? path.join(process.resourcesPath, 'icon.ico') : path.join(app.getAppPath(), 'resources/icon.ico'), show: false,
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, spellcheck: false, webSecurity: true } });
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));

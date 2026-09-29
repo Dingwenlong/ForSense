@@ -1,6 +1,7 @@
 export interface PreviewSettings { preset: string; width: number; height: number }
+export interface PreviewBounds { width: number; height: number }
 export const PREVIEW_LIMITS = { width: { min: 240, max: 1440 }, height: { min: 320, max: 1600 } };
-export const DEFAULT_PREVIEW: PreviewSettings = { preset: 'custom', width: 520, height: 780 };
+export const DEFAULT_PREVIEW: PreviewSettings = { preset: 'default', width: 520, height: 780 };
 export const PREVIEW_STORAGE_KEY = 'social-copy-preview-v1';
 
 // CSS viewport sizes, from Chromium DevTools' device presets. These are not physical screen pixels.
@@ -22,5 +23,10 @@ export function normalizePreviewSettings(input: unknown): PreviewSettings {
   const width = clampPreviewSize(typeof data.width === 'number' ? data.width : DEFAULT_PREVIEW.width, 'width');
   const height = clampPreviewSize(typeof data.height === 'number' ? data.height : DEFAULT_PREVIEW.height, 'height');
   const preset = DEVICE_PRESETS.find(p => p.id === data.preset && p.width === width && p.height === height);
-  return { preset: preset?.id || 'custom', width, height };
+  const isDefault = (data.preset == null || data.preset === 'default') && width === DEFAULT_PREVIEW.width && height === DEFAULT_PREVIEW.height;
+  return { preset: preset?.id || (isDefault ? 'default' : 'custom'), width, height };
+}
+
+export function fitPreviewSettings(settings: PreviewSettings, available: PreviewBounds): PreviewSettings {
+  return { ...settings, width: Math.min(settings.width, Math.max(1, Math.floor(available.width))), height: Math.min(settings.height, Math.max(1, Math.floor(available.height))) };
 }

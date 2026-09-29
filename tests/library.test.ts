@@ -70,15 +70,15 @@ test('global library preserves shared drafts, migrates old records and retains m
   await store.save({ ...first, items: [original] }); await store.save({ ...second, items: [original] });
   assert.equal((await store.library()).assets[0].usedBy.length, 2);
   assert.ok((await store.library()).assets[0].createdAt);
-  await Promise.all([store.updateAsset(original.id, { favorite: true }), store.updateAsset(original.id, { name: '共享素材', archived: true })]);
+  await Promise.all([store.updateAsset(original.id, { favorite: true }), store.updateAsset(original.id, { name: '共享素材' })]);
   const restarted = new Store(store.root); await restarted.init();
   const archived = (await restarted.library()).assets[0];
-  assert.equal(archived.favorite, true); assert.equal(archived.archived, true); assert.equal(archived.name, '共享素材');
+  assert.equal(archived.favorite, true); assert.equal(archived.name, '共享素材');
   assert.equal((await restarted.load(first.id)).items[0].id, original.id);
   await restarted.remove(first.id);
   assert.equal((await restarted.library()).assets[0].usedBy.length, 1);
   assert.deepEqual(await fs.readFile(await restarted.assetPath(original.id, 'image')), originalBytes);
-  await restarted.updateAsset(original.id, { archived: false });
+  await assert.rejects(restarted.updateAsset(original.id, { archived: true }));
   await assert.rejects(store.updateAsset(original.id, { imageFile: '../../external.png' }));
   await assert.rejects(store.updateAsset('../external', { name: 'x' }));
 

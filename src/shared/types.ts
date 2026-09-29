@@ -11,7 +11,8 @@ export interface MediaAsset {
 }
 export interface LibraryAsset extends MediaAsset { usedBy: string[] }
 export interface LibrarySnapshot { assets: LibraryAsset[]; videos: Omit<VideoSource, 'frames'>[]; warnings: string[] }
-export interface AssetUpdate { name?: string; favorite?: boolean; archived?: boolean }
+export interface AssetUpdate { name?: string; favorite?: boolean }
+export interface LibraryItemRef { kind: 'asset' | 'video'; id: string }
 export interface Draft {
   version: 1; id: string; platform: Platform; caption: string;
   items: MediaAsset[]; createdAt: string; updatedAt: string;
@@ -38,6 +39,7 @@ export interface DesktopAPI {
   saveDraft(draft: Draft): Promise<Draft>;
   saveDraftAs(id: string): Promise<Draft>;
   deleteDraft(id: string): Promise<void>;
+  deleteLibraryItems(items: LibraryItemRef[]): Promise<{ count: number }>;
   pickImages(): Promise<string[]>;
   pickVideo(): Promise<string | null>;
   pickDirectory(): Promise<string | null>;
@@ -48,7 +50,7 @@ export interface DesktopAPI {
   copyText(text: string): Promise<void>;
   reveal(path: string): Promise<void>;
   openHelp(): Promise<void>;
-  getInfo(): Promise<{ version: string; dataDirectory: string; compatibility: string }>;
+  getInfo(): Promise<{ version: string; dataDirectory: string; assetDirectory: string; compatibility: string }>;
   onClose(callback: () => void): () => void;
   closeReady(): Promise<void>;
 }

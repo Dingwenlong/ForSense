@@ -54,10 +54,13 @@ img, video { max-width: 100%; }
 .workbench-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-left: auto; }
 .workbench-preview { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
 .workbench-preview-scroll { flex: 1; min-height: 0; overflow: auto; padding: 14px; }
-.preview-size-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.preview-size-controls label { display: inline-flex; align-items: center; gap: 4px; }
-.preview-size-controls select { width: 190px; }
-.preview-size-controls input { width: 65px; }
+.preview-size-controls { position: relative; display: inline-flex; align-items: center; gap: 4px; border: 1px solid GrayText; padding: 2px 5px; }
+.preview-size-trigger { display: inline-flex; align-items: center; gap: 12px; min-width: 90px; justify-content: space-between; border: 0; background: transparent; }
+.preview-size-panel { position: absolute; top: calc(100% + 6px); left: 0; z-index: 40; width: 320px; max-width: calc(100vw - 32px); padding: 6px; border: 1px solid GrayText; background: Canvas; }
+.preview-size-panel [role="option"] { display: block; width: 100%; padding: 7px 8px; border: 0; text-align: left; background: transparent; font-variant-numeric: tabular-nums; }
+.preview-size-panel [role="option"]:hover, .preview-size-panel [role="option"][aria-selected="true"] { background: #eee; }
+.preview-size-fields, .preview-dimension { display: inline-flex; align-items: center; gap: 4px; }
+.preview-size-fields input { width: 62px; border: 0; background: transparent; padding: 2px; }
 .preview-viewport { margin: 0 auto; overflow: auto; background: #fff; border: 1px solid #dedfe2; }
 .preview-viewport .wechat-proof, .preview-viewport .douyin-proof { width: 100%; margin: 0; border: 0; }
 
@@ -246,3 +249,7 @@ img, video { max-width: 100%; }
 @media (max-width: 800px) {
   .optimization-editor, .example-grid, .template-grid { grid-template-columns: 1fr; }
 }
+
+.favorite-button { display: inline-flex; align-items: center; justify-content: center; }
+.favorite-button[aria-pressed="true"] { outline: none; }
+.favorite-button:focus-visible { outline: 2px solid Highlight; }
