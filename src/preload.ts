@@ -1,6 +1,10 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
-import type { DesktopAPI, ExportJob, DesktopWindowState } from './shared/types';
+import type { DesktopAPI, ExportJob, DesktopWindowState, LibraryProgress } from './shared/types';
 const api: DesktopAPI = {
+  pickLibraryDirectory: () => ipcRenderer.invoke('settings:pick-library'),
+  changeLibraryDirectory: directory => ipcRenderer.invoke('settings:library', directory),
+  cancelLibraryChange: () => ipcRenderer.invoke('settings:cancel'),
+  onLibraryProgress: callback => { const handler = (_: unknown, progress: LibraryProgress) => callback(progress); ipcRenderer.on('settings:progress', handler); return () => ipcRenderer.removeListener('settings:progress', handler); },
   getWindowState: () => ipcRenderer.invoke('window:state'),
   windowAction: action => ipcRenderer.invoke('window:action', action),
   onWindowState: callback => { const handler = (_: unknown, state: DesktopWindowState) => callback(state); ipcRenderer.on('window:state-changed', handler); return () => ipcRenderer.removeListener('window:state-changed', handler); },

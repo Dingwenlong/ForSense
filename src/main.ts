@@ -4,6 +4,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { promises as fs } from 'node:fs';
 import { z } from 'zod';
+import { loadLibraryDirectory, migrateLibrary } from './core/library-location';
 import { Store, uuid } from './core/store';
 import { deleteLibraryItems } from './core/library-delete';
 import { MediaService } from './core/service';
@@ -22,7 +23,7 @@ let window: BrowserWindow | null = null;
 let service: MediaService;
 let readyToClose = false;
 let mutationQueue: Promise<unknown> = Promise.resolve();
-const mutations = new Set(['library:delete', 'library:update', 'library:video-update', 'drafts:create', 'drafts:save', 'drafts:save-as', 'drafts:delete', 'jobs:start']);
+const mutations = new Set(['library:delete', 'library:update', 'library:video-update', 'drafts:create', 'drafts:save', 'drafts:save-as', 'drafts:delete', 'jobs:start', 'settings:library']);
 const ownsLock = app.requestSingleInstanceLock();
 if (!ownsLock) app.quit();
 app.on('second-instance', () => { window?.restore(); window?.focus(); });
@@ -41,12 +42,15 @@ function register(name: string, handler: (...args: any[]) => unknown) {
 }
 if (ownsLock && !started) app.whenReady().then(async () => {
   Menu.setApplicationMenu(null);
-  const root = path.join(app.getPath('userData'), 'library');
-  const store = new Store(root); await store.init();
+  const settingsFile = path.join(app.getPath('userData'), 'settings.json');
+  let root = await loadLibraryDirectory(settingsFile, path.join(app.getPath('userData'), 'library'));
+  let store = new Store(root); await store.init();
+  let migration: AbortController | null = null;
   const mediaRoot = app.isPackaged ? path.join(process.resourcesPath, 'media') : path.join(app.getAppPath(), 'resources/media');
-  service = new MediaService(store, { ffmpeg: path.join(mediaRoot, 'ffmpeg.exe'), ffprobe: path.join(mediaRoot, 'ffprobe.exe') }, job => {
+  const createService = () => new MediaService(store, { ffmpeg: path.join(mediaRoot, 'ffmpeg.exe'), ffprobe: path.join(mediaRoot, 'ffprobe.exe') }, job => {
     if (window && !window.isDestroyed()) window.webContents.send('jobs:update', job);
   });
+  service = createService();
   protocol.handle('media', async request => {
     try {
       const url = new URL(request.url), parts = url.pathname.split('/').filter(Boolean);
@@ -58,6 +62,23 @@ if (ownsLock && !started) app.whenReady().then(async () => {
     } catch { return new Response('Not found', { status: 404 }); }
   });
   const approvedDirectories = new Set<string>();
+  const approvedLibraryDirectories = new Set<string>();
+  register('settings:pick-library', async () => {
+    const result = await dialog.showOpenDialog(window!, { title: '选择新的空素材库文件夹', properties: ['openDirectory', 'createDirectory'] });
+    const directory = result.filePaths[0]; if (directory) approvedLibraryDirectories.add(path.resolve(directory)); return directory || null;
+  });
+  register('settings:cancel', () => migration?.abort());
+  register('settings:library', async input => {
+    const destination = z.string().min(1).parse(input);
+    if (!approvedLibraryDirectories.has(path.resolve(destination))) throw new Error('请通过选择文件夹指定素材库位置');
+    if (service.active()) throw new Error('请等待媒体处理任务完成再更换素材库');
+    migration = new AbortController();
+    try {
+      const next = await migrateLibrary(store, destination, settingsFile, migration.signal, (percent, message) => window?.webContents.send('settings:progress', { percent, message }));
+      root = next; store = new Store(root); service = createService();
+      return { dataDirectory: root, assetDirectory: path.join(root, 'assets') };
+    } finally { migration = null; }
+  });
   register('library:delete', items => {
     if (service.active()) throw new Error('请等待媒体任务完成后再删除素材');
     return deleteLibraryItems(store, items, directory => shell.trashItem(directory));
@@ -135,6 +156,7 @@ if (ownsLock && !started) app.whenReady().then(async () => {
   window.on('close', event => {
     if (readyToClose) return;
     event.preventDefault();
+    if (migration) { migration.abort(); return; }
     if (service.active()) {
       const result = dialog.showMessageBoxSync(window!, { type: 'question', title: '退出片语', message: '还有任务正在处理。退出将取消未完成任务。', buttons: ['继续处理', '保存草稿并退出'], defaultId: 0, cancelId: 0 });
       if (result === 0) return;

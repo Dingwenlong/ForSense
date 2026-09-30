@@ -8,13 +8,14 @@ import { WindowTitleBar } from './WindowTitleBar';
 import { Modal } from './Modal';
 import { CropEditor } from './CropEditor';
 import { VideoTool } from './VideoTool';
+import { SettingsPage } from './SettingsPage';
 import { LibraryPage } from './pages';
 import { WorkbenchPage } from './WorkbenchPage';
 import { BackButton } from './BackButton';
 import { AssetBrowser } from './AssetBrowser';
 import { OptimizationPage, emptyOptimizationSession, type OptimizationSession } from './OptimizationPage';
 
-type Page = 'library' | 'workbench' | 'assets' | 'optimization';
+type Page = 'library' | 'workbench' | 'assets' | 'optimization' | 'settings';
 
 export function App() {
   const [drafts, setDrafts] = useState<Draft[]>([]), [draft, setDraft] = useState<Draft | null>(null), [pageStack, setPageStack] = useState<Page[]>(['library']), [filter, setFilter] = useState<'all' | 'moments' | 'douyin'>('all'), [query, setQuery] = useState('');
@@ -25,6 +26,7 @@ export function App() {
   });
   useEffect(() => { try { localStorage.setItem(PREVIEW_STORAGE_KEY, JSON.stringify(previewSettings)); } catch { /* Keep the current preview usable when preference storage is unavailable. */ } }, [previewSettings]);
   const [libraryRevision, setLibraryRevision] = useState(0), [assetPicker, setAssetPicker] = useState<'draft' | 'ai' | null>(null);
+  const [dataDirectory, setDataDirectory] = useState('');
   const [assetDirectory, setAssetDirectory] = useState(''), [directoryError, setDirectoryError] = useState('');
   const [optimization, setOptimization] = useState<OptimizationSession>(emptyOptimizationSession);
   const [busy, setBusy] = useState(false), [loading, setLoading] = useState(true);
@@ -59,7 +61,7 @@ export function App() {
   const flushRef = useRef(flush); flushRef.current = flush;
   useEffect(() => {
     let active = true;
-    void window.desktop.getInfo().then(info => { if (active) setAssetDirectory(info.assetDirectory); }).catch(error => { if (active) setDirectoryError(errorText(error)); });
+    void window.desktop.getInfo().then(info => { if (active) { setAssetDirectory(info.assetDirectory); setDataDirectory(info.dataDirectory); } }).catch(error => { if (active) setDirectoryError(errorText(error)); });
     window.desktop.listDrafts().then(async result => {
       if (!active) return;
       if (result.warnings.length) setNotice({ text: result.warnings.join('；'), error: true });
@@ -105,8 +107,8 @@ export function App() {
     await flush();
     if (asset.optimization) {
       const original = await window.desktop.getAsset(asset.optimization.sourceId);
-      setOptimization({ source: original, result: asset, templateId: asset.optimization.templateId, prompt: asset.optimization.prompt, step: 3 });
-    } else setOptimization(previous => ({ ...previous, source: asset, result: null, step: 2 }));
+      setOptimization({ source: original, result: asset, templateId: asset.optimization.templateId, prompt: asset.optimization.prompt });
+    } else setOptimization(previous => ({ ...previous, source: asset, result: null }));
     setAssetPicker(null); openPage('optimization');
   });
   const importToLibrary = () => void perform(async () => {
@@ -118,7 +120,7 @@ export function App() {
     const paths = await window.desktop.pickImages(); if (!paths.length) return;
     if (paths.length !== 1) throw new Error('请一次选择一张原图');
     const [source] = await run<MediaAsset[]>('images', paths);
-    setOptimization(previous => ({ ...previous, source, result: null, step: 2 })); setAssetPicker(null);
+    setOptimization(previous => ({ ...previous, source, result: null })); setAssetPicker(null);
   });
   const openLibraryVideo = (id: string) => void perform(async () => {
     await flush(); setVideoSource(await window.desktop.getVideo(id)); setVideoOpen(true); setAssetPicker(null);
@@ -139,19 +141,29 @@ export function App() {
       const paths = await window.desktop.pickImages(); if (!paths.length) return;
       const items = await run<MediaAsset[]>('images', paths); addItems(items); setAssetPicker(null);
     }) : importToLibrary}
-    onUse={mode === 'ai' ? items => { setOptimization(previous => ({ ...previous, source: items[0], result: null, step: 2 })); setAssetPicker(null); } : mode === 'manage' ? createFromLibrary : draft ? selectLibraryItems : undefined}
+    onUse={mode === 'ai' ? items => { setOptimization(previous => ({ ...previous, source: items[0], result: null })); setAssetPicker(null); } : mode === 'manage' ? createFromLibrary : draft ? selectLibraryItems : undefined}
     onDelete={mode === 'manage' ? setDeleteItems : undefined}
     onOptimize={mode === 'manage' ? openOptimization : undefined} onVideo={openLibraryVideo} perform={action => void perform(action)}/>;
   return <div className="app-shell">
     <WindowTitleBar onError={text => setNotice({ text, error: true })}>
       <strong>片语</strong>
       <div className="window-drag-region" aria-hidden="true"/>
-      {page !== 'assets' && <nav className="controls" aria-label="工作区导航">
-        <button aria-pressed={page === 'optimization'} disabled={working} onClick={() => navigate('assets')}>素材库</button>
-      </nav>}
+      <nav className="controls" aria-label="工作区导航">
+        {page !== 'assets' && <button aria-pressed={page === 'optimization'} disabled={working} onClick={() => navigate('assets')}>素材库</button>}
+        {page !== 'settings' && <button disabled={working} onClick={() => navigate('settings')}>设置</button>}
+      </nav>
     </WindowTitleBar>
     <main ref={pageBody} className="page-body">
-      {loading ? <p role="status">正在加载草稿…</p> : page === 'assets' ? <section className="page-content" aria-label="素材库">
+      {loading ? <p role="status">正在加载草稿…</p> : page === 'settings' ? <SettingsPage busy={working} back={goBack} currentDirectory={dataDirectory} changeDirectory={async directory => {
+        setBusy(true);
+        try {
+          await flush(); const info = await window.desktop.changeLibraryDirectory(directory);
+          setDataDirectory(info.dataDirectory); setAssetDirectory(info.assetDirectory); setDirectoryError('');
+          const result = await window.desktop.listDrafts(); setDrafts(result.drafts);
+          const active = draftRef.current; if (active) show(result.drafts.find(item => item.id === active.id) || null);
+          setVideoSource(null); setLibraryRevision(n => n + 1);
+        } finally { setBusy(false); }
+      }}/> : page === 'assets' ? <section className="page-content" aria-label="素材库">
         <header className="page-heading"><BackButton disabled={working} onClick={goBack}/><h1>素材库</h1></header><p className="destination-path library-storage-path" role={directoryError ? 'alert' : undefined}>图片保存位置：{assetDirectory ? <button className="library-directory-link" disabled={working} aria-label="打开素材所在文件夹" onClick={() => void perform(() => window.desktop.openAssetDirectory())}>{assetDirectory}</button> : directoryError ? `读取失败，${directoryError}` : '正在读取…'}</p>{renderAssets('manage')}
       </section> : page === 'optimization' ? <OptimizationPage back={goBack} session={optimization} setSession={setOptimization} busy={working}
         selectImage={() => setAssetPicker('ai')} importImage={importOptimizationSource} copyImage={copyImage} copyPrompt={copyPrompt}

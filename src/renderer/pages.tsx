@@ -32,7 +32,7 @@ export function LibraryPage({ drafts, filter, query, busy, setFilter, setQuery, 
           {item.platform === 'moments' ? '微信' : '抖音'} · {item.items.length} 张素材 ·
           {' '}{new Date(item.updatedAt).toLocaleDateString('zh-CN')}
         </span>
-      </button><button disabled={busy} aria-label={`删除草稿 ${draftName(item.caption)}`} onClick={() => remove(item)}>删除</button></article>)}
+      </button><button className="draft-delete" disabled={busy} aria-label={`删除草稿 ${draftName(item.caption)}`} onClick={() => remove(item)}>删除</button></article>)}
       <button className="draft-create" aria-label="新建草稿" title={drafts.length >= MAX_DRAFTS ? '草稿已达 10 份上限' : '新建草稿'} disabled={busy || drafts.length >= MAX_DRAFTS} onClick={create}>
         <svg aria-hidden="true" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 4v16M4 12h16"/></svg>
       </button>

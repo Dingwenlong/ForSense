@@ -466,9 +466,10 @@ try {
 
   await page.getByRole('button', { name: '查看素材 案例原图', exact: true }).click();
   await page.getByRole('region', { name: '素材详情', exact: true }).getByRole('button', { name: 'AI 图片优化', exact: true }).click();
-  await page.getByRole('heading', { name: '选择一种优化方向', exact: true }).waitFor();
-  assert.equal(await page.locator('.template-option').count(), 20);
-  await page.getByRole('button', { name: '商品柔光 商品 · 让材质、轮廓和背景更干净。', exact: true }).click();
+  await page.getByRole('combobox', { name: '优化模板', exact: true }).waitFor();
+  assert.equal(await page.getByRole('combobox', { name: '优化模板', exact: true }).locator('option').count(), 20);
+  assert.equal(await page.locator('.optimization-steps').count(), 0);
+  await page.getByRole('combobox', { name: '优化模板', exact: true }).selectOption({ label: '商品柔光' });
   await page.getByRole('button', { name: '复制原图', exact: true }).click();
   if (clipboardAvailable) {
     await page.getByText('图片已复制，请先粘贴到外部工具，再复制提示词', { exact: true }).waitFor();

@@ -31,7 +31,12 @@ export interface ExportJob {
 }
 export interface DesktopWindowState { maximized: boolean; focused: boolean }
 export type WindowAction = 'minimize' | 'toggle-maximize' | 'close';
+export interface LibraryProgress { percent: number; message: string }
 export interface DesktopAPI {
+  pickLibraryDirectory(): Promise<string | null>;
+  changeLibraryDirectory(directory: string): Promise<{ dataDirectory: string; assetDirectory: string }>;
+  cancelLibraryChange(): Promise<void>;
+  onLibraryProgress(callback: (progress: LibraryProgress) => void): () => void;
   getWindowState(): Promise<DesktopWindowState>;
   windowAction(action: WindowAction): Promise<void>;
   onWindowState(callback: (state: DesktopWindowState) => void): () => void;
